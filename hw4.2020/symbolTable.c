@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <assert.h>
 // This file is for reference only, you are not required to follow the implementation. //
 
 int HASH(char * str) {

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include "header.h"
 #include "symbolTable.h"
 // This file is for reference only, you are not required to follow the implementation. //
@@ -98,7 +99,7 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
             printf("incompatible types when returning array\n");
             break;
         case EXCESSIVE_ARRAY_DIM_DECLARATION:
-            print(f"")
+            printf("");
             break;
         case RETURN_ARRAY:
             break;
@@ -286,7 +287,7 @@ void checkAssignOrExpr(AST_NODE* assignOrExprRelatedNode) {
     if(assignOrExprRelatedNode->nodeType == EXPR_NODE) processExprNode(assignOrExprRelatedNode);
     else {
         if(assignOrExprRelatedNode->semantic_value.stmtSemanticValue.kind == ASSIGN_STMT) checkAssignmentStmt(assignOrExprRelatedNode);
-        else if(assignOrExprRelatedNode->semantic_value.stmtSemanticValue.kind == FUNCTION_CALL_STMT) checkFunctionCall(assignOrExprRelatedNode)
+        else if(assignOrExprRelatedNode->semantic_value.stmtSemanticValue.kind == FUNCTION_CALL_STMT) checkFunctionCall(assignOrExprRelatedNode);
     }
 }
 
@@ -333,7 +334,7 @@ void checkWriteFunction(AST_NODE* functionCallNode) {
         paramNum++;
         if(param->dataType!=INT_TYPE&&param->dataType!=FLOAT_TYPE&&param->dataType!=CONST_STRING_TYPE){
             if(param->dataType!=ERROR_TYPE) printErrorMsg(param,PARAMETER_TYPE_UNMATCH);
-            functionCallNode->dataType=ERROR_TYPE
+            functionCallNode->dataType=ERROR_TYPE;
         }
         param=param->rightSibling;
     }
@@ -427,19 +428,21 @@ void evaluateExprValue(AST_NODE* exprNode) {
         if(lc->dataType == INT_TYPE && rc->dataType == INT_TYPE) {
             exprNode->dataType = INT_TYPE;
             int lv, rv; getExprOrConstValue(lc, &lv, NULL); getExprOrConstValue(rc, &rv, NULL);
-            exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue={lv+rv,lv-rv,lv*rv,lv/rv,lv==rv,lv>=rv,lv<=rv,lv!=rv,lv>rv,lv<rv,lv&&rv,lv||rv}[exprNode->semantic_value.exprSemanticValue.op.binaryOp];
+            int vals[]={lv+rv,lv-rv,lv*rv,lv/rv,lv==rv,lv>=rv,lv<=rv,lv!=rv,lv>rv,lv<rv,lv&&rv,lv||rv};
+            exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue=vals[exprNode->semantic_value.exprSemanticValue.op.binaryOp];
         }
         else {
             exprNode->dataType = FLOAT_TYPE;
             float lv, rv; getExprOrConstValue(lc, NULL, &lv); getExprOrConstValue(rc, NULL, &rv);
-            exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue={lv+rv,lv-rv,lv*rv,lv/rv,lv==rv,lv>=rv,lv<=rv,lv!=rv,lv>rv,lv<rv,lv&&rv,lv||rv}[exprNode->semantic_value.exprSemanticValue.op.binaryOp];
+            float vals[]={lv+rv,lv-rv,lv*rv,lv/rv,lv==rv,lv>=rv,lv<=rv,lv!=rv,lv>rv,lv<rv,lv&&rv,lv||rv};
+            exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue=vals[exprNode->semantic_value.exprSemanticValue.op.binaryOp];
         }
     }
     else {
         AST_NODE* rc = exprNode->child;
         if(rc->dataType == INT_TYPE) {
             exprNode->dataType = INT_TYPE;
-            int rv; getExprOrConstValue(exprNode, rv, NULL);
+            int rv; getExprOrConstValue(exprNode, &rv, NULL);
             switch(exprNode->semantic_value.exprSemanticValue.op.unaryOp) {
                 case UNARY_OP_POSITIVE:
                     exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue = +rv;
@@ -448,7 +451,7 @@ void evaluateExprValue(AST_NODE* exprNode) {
                     exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue = -rv;
                     break;
                 case UNARY_OP_LOGICAL_NEGATION:
-                    exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue = ~rv;
+                    exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue = !rv;
                     break;
                 default:
                     printf("unhandled unary operator");                
@@ -456,7 +459,7 @@ void evaluateExprValue(AST_NODE* exprNode) {
         }
         else {
             exprNode->dataType = FLOAT_TYPE;
-            float rv; getExprOrConstValue(exprNode, NULL, rv);
+            float rv; getExprOrConstValue(exprNode, NULL, &rv);
             switch(exprNode->semantic_value.exprSemanticValue.op.unaryOp) {
                 case UNARY_OP_POSITIVE:
                     exprNode->semantic_value.exprSemanticValue.constEvalValue.fValue = +rv;
@@ -465,7 +468,7 @@ void evaluateExprValue(AST_NODE* exprNode) {
                     exprNode->semantic_value.exprSemanticValue.constEvalValue.fValue = -rv;
                     break;
                 case UNARY_OP_LOGICAL_NEGATION:
-                    exprNode->semantic_value.exprSemanticValue.constEvalValue.fValue = ~rv;
+                    exprNode->semantic_value.exprSemanticValue.constEvalValue.fValue = !rv;
                     break;
                 default:
                     printf("unhandled unary operator");
@@ -479,14 +482,14 @@ void processExprNode(AST_NODE* exprNode) {
         AST_NODE *lc = exprNode->child, *rc = lc->rightSibling;
         processExprRelatedNode(lc); processExprRelatedNode(rc);
         if(lc->dataType == INT_PTR_TYPE || lc->dataType == FLOAT_PTR_TYPE || rc->dataType == INT_PTR_TYPE || rc->dataType == FLOAT_PTR_TYPE) {
-            exprNode = ERROR_TYPE;
+            exprNode->dataType = ERROR_TYPE;
             printErrorMsg(exprNode, NOT_ASSIGNABLE);
         }
         else if(lc->dataType == CONST_STRING_TYPE || rc->dataType == CONST_STRING_TYPE) {
-            exprNode = ERROR_TYPE;
+            exprNode->dataType = ERROR_TYPE;
             printErrorMsg(exprNode, STRING_OPERATION);
         }
-        else if(lc->dataType == ERROR_TYPE || rc->dataType == ERROR_TYPE) exprNode = ERROR_TYPE;
+        else if(lc->dataType == ERROR_TYPE || rc->dataType == ERROR_TYPE) exprNode->dataType = ERROR_TYPE;
         else {
             exprNode->dataType = getBiggerType(lc->dataType, rc->dataType);
             if((lc->dataType == CONST_VALUE_NODE || (lc->dataType == EXPR_NODE && lc->semantic_value.exprSemanticValue.isConstEval)) && \
@@ -499,14 +502,14 @@ void processExprNode(AST_NODE* exprNode) {
     else {
         AST_NODE *rc = exprNode->child; processExprRelatedNode(rc);
         if(rc->dataType == INT_PTR_TYPE || rc->dataType == FLOAT_PTR_TYPE) {
-            exprNode = ERROR_TYPE;
+            exprNode->dataType = ERROR_TYPE;
             printErrorMsg(exprNode, NOT_ASSIGNABLE);
         }
         else if(rc->dataType == CONST_STRING_TYPE) {
-            exprNode = ERROR_TYPE;
+            exprNode->dataType = ERROR_TYPE;
             printErrorMsg(exprNode, STRING_OPERATION);
         }
-        else if(rc->dataType == ERROR_TYPE) exprNode = ERROR_TYPE;
+        else if(rc->dataType == ERROR_TYPE) exprNode->dataType = ERROR_TYPE;
         else {
             exprNode->dataType = rc->dataType;
             if(rc->dataType == CONST_VALUE_NODE || (rc->dataType == EXPR_NODE && rc->semantic_value.exprSemanticValue.isConstEval)) {
@@ -690,7 +693,7 @@ void processGeneralNode(AST_NODE *node) {
     if(ptr->nodeType == VARIABLE_DECL_LIST_NODE || \
     ptr->nodeType == STMT_LIST_NODE || \
     ptr->nodeType == NONEMPTY_ASSIGN_EXPR_LIST_NODE || \
-    ptr->nodeType == || NONEMPTY_RELOP_EXPR_LIST_NODE) {
+    ptr->nodeType == NONEMPTY_RELOP_EXPR_LIST_NODE) {
         
         while(ptr) {
             if(ptr->nodeType == VARIABLE_DECL_LIST_NODE) processDeclarationNode(ptr);
@@ -709,7 +712,7 @@ void processGeneralNode(AST_NODE *node) {
 }
 
 void processDeclDimList(AST_NODE* idNode, TypeDescriptor* typeDescriptor, int ignoreFirstDimSize) {
-    AST_NODE* ptr = idNode->child; typeDescriptor = ARRAY_TYPE_DESCRIPTOR;
+    AST_NODE* ptr = idNode->child; typeDescriptor->kind = ARRAY_TYPE_DESCRIPTOR;
     int dim = 0;
     if(ignoreFirstDimSize && ptr->nodeType == NUL_NODE) {
         typeDescriptor->properties.arrayProperties.sizeInEachDimension[dim++] = 0;
