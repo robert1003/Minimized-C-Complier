@@ -85,6 +85,8 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
     printf("Error found in line %d\n", node->linenumber);
     switch(errorMsgKind) {
         case SYMBOL_IS_NOT_TYPE:
+            /* TODO */
+            printf("symbol is not type\n");
             break;
         case SYMBOL_REDECLARE:
             printf("conflicting types for '%s'", node->semantic_value.identifierSemanticValue.symbolTableEntry->name);
@@ -150,6 +152,8 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
             break;
     }
 }
+/* TODO debug message */
+#define printErrorMsg fprintf(stderr,"error line: %d\n",__LINE__),printErrorMsg
 
 
 void semanticAnalysis(AST_NODE *root) {
@@ -202,7 +206,7 @@ void processDeclarationNode(AST_NODE* declarationNode) {
 
 void processTypeNode(AST_NODE* idNodeAsType) {
     SymbolTableEntry* entry = retrieveSymbol(idNodeAsType->semantic_value.identifierSemanticValue.identifierName);
-    if(entry || entry->attribute->attributeKind != TYPE_DECL) {
+    if(!entry || entry->attribute->attributeKind != TYPE_DECL) {
         printErrorMsg(idNodeAsType, SYMBOL_IS_NOT_TYPE);
         idNodeAsType->dataType = ERROR_TYPE;
         return;
@@ -690,24 +694,25 @@ void processStmtNode(AST_NODE* stmtNode) {
 
 void processGeneralNode(AST_NODE *node) {
     AST_NODE* ptr = node->child;
-    if(ptr->nodeType == VARIABLE_DECL_LIST_NODE || \
-    ptr->nodeType == STMT_LIST_NODE || \
-    ptr->nodeType == NONEMPTY_ASSIGN_EXPR_LIST_NODE || \
-    ptr->nodeType == NONEMPTY_RELOP_EXPR_LIST_NODE) {
-        
+    if(node->nodeType == VARIABLE_DECL_LIST_NODE || 
+    node->nodeType == STMT_LIST_NODE || 
+    node->nodeType == NONEMPTY_ASSIGN_EXPR_LIST_NODE || 
+    node->nodeType == NONEMPTY_RELOP_EXPR_LIST_NODE) {
+        int error=0;
         while(ptr) {
-            if(ptr->nodeType == VARIABLE_DECL_LIST_NODE) processDeclarationNode(ptr);
-            else if(ptr->nodeType == STMT_LIST_NODE) processStmtNode(ptr);
-            else if(ptr->nodeType == NONEMPTY_ASSIGN_EXPR_LIST_NODE) checkAssignOrExpr(ptr);
-            else if(ptr->nodeType == NONEMPTY_RELOP_EXPR_LIST_NODE) processExprRelatedNode(ptr);
-            if(ptr->dataType == ERROR_TYPE) node->dataType = ERROR_TYPE;
+            if(node->nodeType == VARIABLE_DECL_LIST_NODE) processDeclarationNode(ptr);
+            else if(node->nodeType == STMT_LIST_NODE) processStmtNode(ptr);
+            else if(node->nodeType == NONEMPTY_ASSIGN_EXPR_LIST_NODE) checkAssignOrExpr(ptr);
+            else if(node->nodeType == NONEMPTY_RELOP_EXPR_LIST_NODE) processExprRelatedNode(ptr);
+            if(ptr->dataType == ERROR_TYPE) error=1;
             ptr = ptr->rightSibling;
         }
+        if(error) node->nodeType=ERROR_TYPE;
     }
     else if(ptr->nodeType == NUL_NODE) { /* do nothing */ }
     else {
-        node->dataType = ERROR_TYPE;
         printf("unhandled general node type");
+        node->dataType = ERROR_TYPE;
     }
 }
 

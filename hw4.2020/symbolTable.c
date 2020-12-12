@@ -55,7 +55,7 @@ void initializeSymbolTable() {
                                 cur->attributeKind=TYPE_ATTRIBUTE;\
                                 cur->attr.typeDescriptor = (TypeDescriptor*)malloc(sizeof(TypeDescriptor));\
                                 cur->attr.typeDescriptor->kind = SCALAR_TYPE_DESCRIPTOR;\
-                                cur->attr.typeDescriptor->properties.dataType = var_type;\ 
+                                cur->attr.typeDescriptor->properties.dataType = var_type;\
                                 enterSymbol(var_name,cur);
 
     #define insertFuncSymbol(func_name,func_type) cur=(SymbolAttribute*)malloc(sizeof(SymbolAttribute));\
