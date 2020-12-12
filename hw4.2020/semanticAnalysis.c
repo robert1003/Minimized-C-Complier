@@ -6,6 +6,7 @@
 #include "symbolTable.h"
 // This file is for reference only, you are not required to follow the implementation. //
 // You only need to check for errors stated in the hw4 document. //
+// TODO test typedef and bonus
 int g_anyErrorOccur = 0;
 
 DATA_TYPE getBiggerType(DATA_TYPE dataType1, DATA_TYPE dataType2);
@@ -67,6 +68,7 @@ void printErrorMsgSpecial(AST_NODE* node1, char* name2, ErrorMsgKind errorMsgKin
     printf("Error found in line %d\n", node1->linenumber);
     switch(errorMsgKind) {
         case PASS_ARRAY_TO_SCALAR:
+            /* TODO it should print type name instead of variable */
             printf("invalid conversion from \'%s\' to \'%s\'\n", \
                 node1->semantic_value.identifierSemanticValue.identifierName, name2);
             break;
@@ -83,13 +85,17 @@ void printErrorMsgSpecial(AST_NODE* node1, char* name2, ErrorMsgKind errorMsgKin
 void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
     g_anyErrorOccur = 1;
     printf("Error found in line %d\n", node->linenumber);
+/* TODO remove debug message */
+#define printf fprintf(stderr,"print error in line %d\n",__LINE__),printf
+    /* TODO IS_FUNCTION_NOT_VARIABLE is not handled */
     switch(errorMsgKind) {
         case SYMBOL_IS_NOT_TYPE:
             /* TODO */
             printf("symbol is not type\n");
             break;
         case SYMBOL_REDECLARE:
-            printf("conflicting types for '%s'", node->semantic_value.identifierSemanticValue.symbolTableEntry->name);
+            /* TODO conflict type if type is not the same, and redeclaration if type is the same */
+            printf("conflicting types for '%s'\n", node->semantic_value.identifierSemanticValue.identifierName);
             break;
         case SYMBOL_UNDECLARED:
             printf("'%s' was not declared in this scope\n", node->semantic_value.identifierSemanticValue.identifierName);
@@ -112,7 +118,8 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
             printf("declaration of '%s' as array of voids\n", node->semantic_value.identifierSemanticValue.identifierName);
             break;
         case PARAMETER_TYPE_UNMATCH:
-            printf("incompatible type for arguments of '%s'", node->semantic_value.identifierSemanticValue.identifierName);
+            /* TODO only string literal parameter will lead to this error */
+            printf("incompatible type for arguments of '%s'\n", (node->nodeType==CONST_VALUE_NODE?node->semantic_value.const1->const_u.sc:node->semantic_value.identifierSemanticValue.identifierName));
             break;
         case TOO_FEW_ARGUMENTS:
             printf("too few arguments to function '%s'\n", node->semantic_value.identifierSemanticValue.identifierName);
@@ -151,6 +158,7 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
             printf("Unhandled case in void printErrorMsg(AST_NODE* node, ERROR_MSG_KIND* errorMsgKind)\n");
             break;
     }
+#undef printf
 }
 /* TODO debug message */
 #define printErrorMsg fprintf(stderr,"error line: %d\n",__LINE__),printErrorMsg
@@ -239,6 +247,7 @@ void declareIdList(AST_NODE* declarationNode, SymbolAttributeKind isVariableOrTy
             switch(ptr->semantic_value.identifierSemanticValue.kind){
                 case NORMAL_ID:
                 case WITH_INIT_ID:
+                    /* TODO init list with undeclared variable */
                     attr->attr.typeDescriptor=tpdes;
                     if(ptr->semantic_value.identifierSemanticValue.kind==WITH_INIT_ID&&attr->attr.typeDescriptor->kind==ARRAY_TYPE_DESCRIPTOR){
                         printErrorMsg(ptr,TRY_TO_INIT_ARRAY);
@@ -343,7 +352,7 @@ void checkWriteFunction(AST_NODE* functionCallNode) {
         param=param->rightSibling;
     }
     if(paramNum==1&&functionCallNode->dataType!=ERROR_TYPE) functionCallNode->dataType=VOID_TYPE;
-    else{
+    else if(functionCallNode->dataType!=ERROR_TYPE){
         printErrorMsg(funcIDNode,(paramNum>1?TOO_MANY_ARGUMENTS:TOO_FEW_ARGUMENTS));
         functionCallNode->dataType=ERROR_TYPE;
     }
@@ -538,7 +547,7 @@ void processVariableLValue(AST_NODE* idNode) {
     }
     TypeDescriptor* tpdes=entry->attribute->attr.typeDescriptor;
     if(idNode->semantic_value.identifierSemanticValue.kind==NORMAL_ID){
-        if(tpdes->kind==ARRAY_TYPE_DESCRIPTOR) error(INCOMPATIBLE_ARRAY_DIMENSION);
+        if(tpdes->kind==ARRAY_TYPE_DESCRIPTOR) error(NOT_ASSIGNABLE);
         else idNode->dataType=tpdes->properties.dataType;
     }
     else if(idNode->semantic_value.identifierSemanticValue.kind==ARRAY_ID){
@@ -693,11 +702,11 @@ void processStmtNode(AST_NODE* stmtNode) {
 }
 
 void processGeneralNode(AST_NODE *node) {
-    AST_NODE* ptr = node->child;
     if(node->nodeType == VARIABLE_DECL_LIST_NODE || 
     node->nodeType == STMT_LIST_NODE || 
     node->nodeType == NONEMPTY_ASSIGN_EXPR_LIST_NODE || 
     node->nodeType == NONEMPTY_RELOP_EXPR_LIST_NODE) {
+        AST_NODE* ptr = node->child;
         int error=0;
         while(ptr) {
             if(node->nodeType == VARIABLE_DECL_LIST_NODE) processDeclarationNode(ptr);
@@ -709,7 +718,7 @@ void processGeneralNode(AST_NODE *node) {
         }
         if(error) node->nodeType=ERROR_TYPE;
     }
-    else if(ptr->nodeType == NUL_NODE) { /* do nothing */ }
+    else if(node->nodeType == NUL_NODE) { /* do nothing */ }
     else {
         printf("unhandled general node type");
         node->dataType = ERROR_TYPE;
@@ -774,7 +783,7 @@ void declareFunction(AST_NODE* declarationNode) {
             cur->next=NULL;
             cur->parameterName=param->semantic_value.identifierSemanticValue.identifierName;
             cur->type=param->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
-            if(!tail) attr->attr.functionSignature->parameterList=cur;
+            if(!tail) tail=attr->attr.functionSignature->parameterList=cur;
             else tail=tail->next=cur;
         }
         ptr=ptr->rightSibling;
