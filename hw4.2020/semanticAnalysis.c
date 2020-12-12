@@ -39,7 +39,9 @@ void evaluateExprValue(AST_NODE* exprNode);
 typedef enum ErrorMsgKind {
     SYMBOL_IS_NOT_TYPE,
     SYMBOL_REDECLARE,
+    SYMBOL_CONFLICT,
     SYMBOL_UNDECLARED,
+    FUNCTION_REDECLARE,
     NOT_FUNCTION_NAME,
     TRY_TO_INIT_ARRAY,
     EXCESSIVE_ARRAY_DIM_DECLARATION,
@@ -81,6 +83,7 @@ char* getNameOfDataType(DATA_TYPE type) {
             return "float*";
             break;
         default:
+            printf("undefined %d\n", type);
             return "undefined";
     }
 }
@@ -94,13 +97,12 @@ void printErrorMsgSpecial(AST_NODE* node1, char* name2, ErrorMsgKind errorMsgKin
     printf("Error found in line %d\n", node1->linenumber);
     switch(errorMsgKind) {
         case PASS_ARRAY_TO_SCALAR:
-            /* TODO it should print type name instead of variable */
             printf("invalid conversion from \'%s\' to \'%s\'\n", \
-                node1->semantic_value.identifierSemanticValue.identifierName, name2);
+                getNameOfDataType(node1->dataType), name2);
             break;
         case PASS_SCALAR_TO_ARRAY:
             printf("invalid conversion from \'%s\' to \'%s\'\n", \
-                node1->semantic_value.identifierSemanticValue.identifierName, name2);
+                getNameOfDataType(node1->dataType), name2);
             break;
         default:
             printf("Unhandled case in void printErrorMsg(AST_NODE* node, ERROR_MSG_KIND* errorMsgKind)\n");
@@ -119,13 +121,13 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
             printf("unknown type name '%s'\n", node->semantic_value.identifierSemanticValue.identifierName);
             break;
         case SYMBOL_REDECLARE:
-            // TODO: gcc is "redeclaration of 'c' with no linkage", spec is "redeclaration of ‘<type> <name>’"
-            if(getTypeOfSymbolTableEntry(retrieveSymbol(node->semantic_value.identifierSemanticValue.identifierName)) == node->dataType) {
-                printf("redeclaration of '%s' with no linkage\n", node->semantic_value.identifierSemanticValue.identifierName);
-            }
-            else {
-                printf("conflicting types for '%s'\n", node->semantic_value.identifierSemanticValue.identifierName);
-            }
+            printf("redeclaration of '%s' with no linkage\n", node->semantic_value.identifierSemanticValue.identifierName);
+            break;
+        case SYMBOL_CONFLICT:
+            printf("conflicting types for '%s'\n", node->semantic_value.identifierSemanticValue.identifierName);
+            break;
+        case FUNCTION_REDECLARE:
+            printf("redefinition of '%s'\n", node->semantic_value.identifierSemanticValue.identifierName);
             break;
         case SYMBOL_UNDECLARED:
             printf("'%s' was not declared in this scope\n", node->semantic_value.identifierSemanticValue.identifierName);
@@ -267,7 +269,8 @@ void declareIdList(AST_NODE* declarationNode, SymbolAttributeKind isVariableOrTy
     while(ptr){
         if(declaredLocally(ptr->semantic_value.identifierSemanticValue.identifierName))
         {
-            printErrorMsg(ptr, SYMBOL_REDECLARE);
+            if(getTypeOfSymbolTableEntry(retrieveSymbol(ptr->semantic_value.identifierSemanticValue.identifierName)) == tpdes->properties.dataType) printErrorMsg(ptr, SYMBOL_REDECLARE);
+            else printErrorMsg(ptr, SYMBOL_CONFLICT);
             ptr->dataType=ERROR_TYPE;
             declarationNode->dataType=ERROR_TYPE;
         }
@@ -276,13 +279,19 @@ void declareIdList(AST_NODE* declarationNode, SymbolAttributeKind isVariableOrTy
             attr->attributeKind=isVariableOrTypeAttribute;
             switch(ptr->semantic_value.identifierSemanticValue.kind){
                 case NORMAL_ID:
-                case WITH_INIT_ID:
-                    /* TODO init list with undeclared variable */
                     attr->attr.typeDescriptor=tpdes;
-                    if(ptr->semantic_value.identifierSemanticValue.kind==WITH_INIT_ID&&attr->attr.typeDescriptor->kind==ARRAY_TYPE_DESCRIPTOR){
+                    break;
+                case WITH_INIT_ID:
+                    attr->attr.typeDescriptor=tpdes;
+                    if((ptr->child->nodeType != CONST_VALUE_NODE) && (!declaredLocally(ptr->child->semantic_value.identifierSemanticValue.identifierName))) {
+                        printErrorMsg(ptr->child, SYMBOL_UNDECLARED);
+                        ptr->dataType=ERROR_TYPE;
+                    }
+                    else if(attr->attr.typeDescriptor->kind==ARRAY_TYPE_DESCRIPTOR){
                         printErrorMsg(ptr,TRY_TO_INIT_ARRAY);
                         ptr->dataType=ERROR_TYPE;
                     }
+
                     break;
                 case ARRAY_ID:
                     if(isVariableOrTypeAttribute==TYPE_ATTRIBUTE&&tpdes->kind==SCALAR_TYPE_DESCRIPTOR&&tpdes->properties.dataType==VOID_TYPE){
@@ -425,12 +434,12 @@ void checkFunctionCall(AST_NODE* functionCallNode) {
 void checkParameterPassing(Parameter* formalParameter, AST_NODE* actualParameter) {
     int isptr = (actualParameter->dataType == INT_PTR_TYPE || actualParameter->dataType == FLOAT_PTR_TYPE);
     if(formalParameter->type->kind == ARRAY_TYPE_DESCRIPTOR && !isptr) {
+        printErrorMsgSpecial(actualParameter, getNameOfDataType(formalParameter->type->properties.arrayProperties.elementType==INT_TYPE?INT_PTR_TYPE:FLOAT_PTR_TYPE), PASS_SCALAR_TO_ARRAY);
         actualParameter->dataType = ERROR_TYPE;
-        printErrorMsgSpecial(actualParameter, formalParameter->parameterName, PASS_SCALAR_TO_ARRAY);
     }
     else if(formalParameter->type->kind == SCALAR_TYPE_DESCRIPTOR && isptr) {
+        printErrorMsgSpecial(actualParameter, getNameOfDataType(formalParameter->type->properties.arrayProperties.elementType), PASS_ARRAY_TO_SCALAR);
         actualParameter->dataType = ERROR_TYPE;
-        printErrorMsgSpecial(actualParameter, formalParameter->parameterName, PASS_ARRAY_TO_SCALAR);
     }
     else if(actualParameter->dataType == CONST_STRING_TYPE) {
         actualParameter->dataType = ERROR_TYPE;
@@ -792,7 +801,7 @@ void declareFunction(AST_NODE* declarationNode) {
     int err = 0, enter=0;
     if(ret->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->kind == ARRAY_TYPE_DESCRIPTOR)
         error(ret,RETURN_ARRAY);
-    if(declaredLocally(name->semantic_value.identifierSemanticValue.identifierName)) error(name,SYMBOL_REDECLARE);
+    if(declaredLocally(name->semantic_value.identifierSemanticValue.identifierName)) error(name,FUNCTION_REDECLARE);
     SymbolAttribute* attr=(SymbolAttribute*)malloc(sizeof(SymbolAttribute));
     attr->attributeKind=FUNCTION_SIGNATURE;
     attr->attr.functionSignature=(FunctionSignature*)malloc(sizeof(FunctionSignature));
