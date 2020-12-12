@@ -63,6 +63,32 @@ typedef enum ErrorMsgKind {
     PASS_SCALAR_TO_ARRAY
 } ErrorMsgKind;
 
+char* getNameOfDataType(DATA_TYPE type) {
+    switch(type) {
+        case INT_TYPE:
+            return "int";
+            break;
+        case FLOAT_TYPE:
+            return "float";
+            break;
+        case VOID_TYPE:
+            return "void";
+            break;
+        case INT_PTR_TYPE:
+            return "int*";
+            break;
+        case FLOAT_PTR_TYPE:
+            return "float*";
+            break;
+        default:
+            return "undefined";
+    }
+}
+
+DATA_TYPE getTypeOfSymbolTableEntry(SymbolTableEntry* entry) {
+    return entry->attribute->attr.typeDescriptor->properties.dataType;
+}
+
 void printErrorMsgSpecial(AST_NODE* node1, char* name2, ErrorMsgKind errorMsgKind) {
     g_anyErrorOccur = 1;
     printf("Error found in line %d\n", node1->linenumber);
@@ -90,12 +116,16 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
     /* TODO IS_FUNCTION_NOT_VARIABLE is not handled */
     switch(errorMsgKind) {
         case SYMBOL_IS_NOT_TYPE:
-            /* TODO */
-            printf("symbol is not type\n");
+            printf("unknown type name '%s'\n", node->semantic_value.identifierSemanticValue.identifierName);
             break;
         case SYMBOL_REDECLARE:
-            /* TODO conflict type if type is not the same, and redeclaration if type is the same */
-            printf("conflicting types for '%s'\n", node->semantic_value.identifierSemanticValue.identifierName);
+            // TODO: gcc is "redeclaration of 'c' with no linkage", spec is "redeclaration of ‘<type> <name>’"
+            if(getTypeOfSymbolTableEntry(retrieveSymbol(node->semantic_value.identifierSemanticValue.identifierName)) == node->dataType) {
+                printf("redeclaration of '%s' with no linkage\n", node->semantic_value.identifierSemanticValue.identifierName);
+            }
+            else {
+                printf("conflicting types for '%s'\n", node->semantic_value.identifierSemanticValue.identifierName);
+            }
             break;
         case SYMBOL_UNDECLARED:
             printf("'%s' was not declared in this scope\n", node->semantic_value.identifierSemanticValue.identifierName);
