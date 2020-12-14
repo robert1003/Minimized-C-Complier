@@ -1,3 +1,4 @@
 *.out
 *.o
 *.swp
+.gdb_history
