@@ -13,7 +13,6 @@
 #define SYMBOL_TABLE_SYS_LIB_FREAD "fread"
 #define HASH_TABLE_SIZE 256
 
-
 typedef enum SymbolAttributeKind
 {
     VARIABLE_ATTRIBUTE,
@@ -92,6 +91,7 @@ typedef struct SymbolTable
     int scopeDisplayElementCount;
 } SymbolTable;
 
+SymbolTable symbolTable;
 
 void initializeSymbolTable();
 void symbolTableEnd();
