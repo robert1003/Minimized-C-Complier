@@ -44,6 +44,7 @@ typedef enum ErrorMsgKind {
     FUNCTION_REDECLARE,
     NOT_FUNCTION_NAME,
     TRY_TO_INIT_ARRAY,
+    PASS_FUNCTION_TO_SCALAR,
     EXCESSIVE_ARRAY_DIM_DECLARATION,
     RETURN_ARRAY,
     VOID_VARIABLE,
@@ -105,6 +106,10 @@ void printErrorMsgSpecial(AST_NODE* node1, char* name2, ErrorMsgKind errorMsgKin
         case PASS_SCALAR_TO_ARRAY:
             printf("invalid conversion from \'%s\' to \'%s\'\n", \
                 getNameOfDataType(node1->dataType), name2);
+            break;
+        case PASS_FUNCTION_TO_SCALAR:
+            printf("invalid conversion from \'%s (*)()\' to \'%s\'\n", \
+                getNameOfDataType(retrieveSymbol(node1->semantic_value.identifierSemanticValue.identifierName)->attribute->attr.functionSignature->returnType), name2);
             break;
         default:
             printf("Unhandled case in void printErrorMsg(AST_NODE* node, ERROR_MSG_KIND* errorMsgKind)\n");
@@ -291,15 +296,25 @@ void declareIdList(AST_NODE* declarationNode, SymbolAttributeKind isVariableOrTy
                     break;
                 case WITH_INIT_ID:
                     attr->attr.typeDescriptor=tpdes;
-                    if((ptr->child->nodeType != CONST_VALUE_NODE) && (!retrieveSymbol(ptr->child->semantic_value.identifierSemanticValue.identifierName))) {
-                        printErrorMsg(ptr->child, SYMBOL_UNDECLARED);
+                    processExprRelatedNode(ptr->child);
+                    if(ptr->child->dataType == ERROR_TYPE) {
                         ptr->dataType=ERROR_TYPE;
                     }
                     else if(attr->attr.typeDescriptor->kind==ARRAY_TYPE_DESCRIPTOR){
                         printErrorMsg(ptr,TRY_TO_INIT_ARRAY);
                         ptr->dataType=ERROR_TYPE;
                     }
-
+                    else if(ptr->child->dataType == INT_PTR_TYPE || ptr->child->dataType == FLOAT_PTR_TYPE) {
+                        printErrorMsgSpecial(ptr->child, getNameOfDataType(tpdes->properties.dataType), PASS_ARRAY_TO_SCALAR);
+                        ptr->dataType=ERROR_TYPE;
+                    }
+                    else {
+                        SymbolTableEntry* entry = retrieveSymbol(ptr->child->semantic_value.identifierSemanticValue.identifierName);
+                        if(entry->attribute->attributeKind == FUNCTION_SIGNATURE) {
+                            printErrorMsgSpecial(ptr->child, getNameOfDataType(tpdes->properties.dataType), PASS_FUNCTION_TO_SCALAR);
+                            ptr->dataType=ERROR_TYPE;
+                        }
+                    }
                     break;
                 case ARRAY_ID:
                     if(isVariableOrTypeAttribute==TYPE_ATTRIBUTE&&tpdes->kind==SCALAR_TYPE_DESCRIPTOR&&tpdes->properties.dataType==VOID_TYPE){
