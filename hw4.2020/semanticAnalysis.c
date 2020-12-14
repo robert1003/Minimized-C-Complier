@@ -6,7 +6,7 @@
 #include "symbolTable.h"
 // This file is for reference only, you are not required to follow the implementation. //
 // You only need to check for errors stated in the hw4 document. //
-// TODO test typedef and bonus
+// TODO remove assert
 int g_anyErrorOccur = 0;
 
 DATA_TYPE getBiggerType(DATA_TYPE dataType1, DATA_TYPE dataType2);
@@ -27,7 +27,7 @@ void checkIfStmt(AST_NODE* ifNode);
 void checkWriteFunction(AST_NODE* functionCallNode);
 void checkFunctionCall(AST_NODE* functionCallNode);
 void processExprRelatedNode(AST_NODE* exprRelatedNode);
-void checkParameterPassing(Parameter* formalParameter, AST_NODE* actualParameter);
+void checkParameterPassing(Parameter* formalParameter, AST_NODE* actualParameter, AST_NODE* funcIDNode);
 void checkReturnStmt(AST_NODE* returnNode);
 void processExprNode(AST_NODE* exprNode);
 void processVariableLValue(AST_NODE* idNode);
@@ -52,7 +52,6 @@ typedef enum ErrorMsgKind {
     PARAMETER_TYPE_UNMATCH,
     TOO_FEW_ARGUMENTS,
     TOO_MANY_ARGUMENTS,
-    RETURN_TYPE_UNMATCH,
     INCOMPATIBLE_ARRAY_DIMENSION,
     NOT_ASSIGNABLE,
     NOT_ARRAY,
@@ -66,7 +65,8 @@ typedef enum ErrorMsgKind {
     PASS_SCALAR_TO_ARRAY,
     PASS_VOID_TO_SCALAR,
     UNARY_VOID,
-    FUNCTION_NOT_RVALUE
+    FUNCTION_NOT_RVALUE,
+    INIT_VAL_NOT_CONST
 } ErrorMsgKind;
 
 typedef enum WarningMsgKind {
@@ -186,7 +186,6 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
     printf("Error found in line %d: ", node->linenumber);
 /* TODO remove debug message */
 #define printf fprintf(stderr,"print error in line %d\n",__LINE__),printf("\033[01;31m"),printf
-    /* TODO IS_FUNCTION_NOT_VARIABLE is not handled */
     switch(errorMsgKind) {
         case SYMBOL_IS_NOT_TYPE:
             printf("unknown type name '%s'\n", node->semantic_value.identifierSemanticValue.identifierName);
@@ -207,12 +206,13 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
             printf("called object '%s' is not a function or function pointer\n", node->semantic_value.identifierSemanticValue.identifierName);
             break;
         case TRY_TO_INIT_ARRAY:
-            printf("incompatible types when returning array\n");
+            printf("array initialization is not supported\n");
             break;
         case EXCESSIVE_ARRAY_DIM_DECLARATION:
-            printf("");
+            printf("excessive array dimention declaration\n");
             break;
-        case RETURN_ARRAY:
+        case IS_FUNCTION_NOT_VARIABLE:
+            printf("lvalue required as left operand of assignment\n");
             break;
         case VOID_VARIABLE:
             printf("variable or field '%s' declared void\n", node->semantic_value.identifierSemanticValue.identifierName);
@@ -221,7 +221,6 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
             printf("declaration of '%s' as array of voids\n", node->semantic_value.identifierSemanticValue.identifierName);
             break;
         case PARAMETER_TYPE_UNMATCH:
-            /* TODO only string literal parameter will lead to this error */
             printf("incompatible type for arguments of '%s'\n", (node->nodeType==CONST_VALUE_NODE?node->semantic_value.const1->const_u.sc:node->semantic_value.identifierSemanticValue.identifierName));
             break;
         case TOO_FEW_ARGUMENTS:
@@ -262,6 +261,12 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
             break;
         case FUNCTION_NOT_RVALUE:
             printf("function name cannot be used as rvalue\n");
+            break;
+        case RETURN_ARRAY:
+            printf("'%s' declared as function returning an array\n", node->semantic_value.identifierSemanticValue.identifierName);
+            break;
+        case INIT_VAL_NOT_CONST:
+            printf("initializer element is not constant\n");
             break;
         default:
             printf("Unhandled case in void printErrorMsg(AST_NODE* node, ERROR_MSG_KIND* errorMsgKind)\n");
@@ -389,6 +394,14 @@ void declareIdList(AST_NODE* declarationNode, SymbolAttributeKind isVariableOrTy
                             ptr->dataType=ERROR_TYPE;
                         }
                     }
+                    
+                    if(symbolTable.currentLevel == 0) {
+                        if(!(ptr->child->nodeType == CONST_VALUE_NODE || (ptr->child->nodeType == EXPR_NODE && ptr->child->semantic_value.exprSemanticValue.isConstEval))) {
+                            printErrorMsg(ptr->child, INIT_VAL_NOT_CONST);
+                            ptr->dataType=ERROR_TYPE;
+                        }
+                    }
+
                     break;
                 case ARRAY_ID:
                     if(isVariableOrTypeAttribute==TYPE_ATTRIBUTE&&tpdes->kind==SCALAR_TYPE_DESCRIPTOR&&tpdes->properties.dataType==VOID_TYPE){
@@ -530,7 +543,7 @@ void checkFunctionCall(AST_NODE* functionCallNode) {
     while(param&&defparam){
         if(param->dataType==ERROR_TYPE) functionCallNode->dataType=ERROR_TYPE;
         else{
-            checkParameterPassing(defparam,param);
+            checkParameterPassing(defparam,param,funcIDNode);
             if(param->dataType==ERROR_TYPE) functionCallNode->dataType=ERROR_TYPE;
         }
         param=param->rightSibling;
@@ -544,7 +557,7 @@ void checkFunctionCall(AST_NODE* functionCallNode) {
         functionCallNode->dataType=entry->attribute->attr.functionSignature->returnType;
 }
 
-void checkParameterPassing(Parameter* formalParameter, AST_NODE* actualParameter) {
+void checkParameterPassing(Parameter* formalParameter, AST_NODE* actualParameter, AST_NODE* funcIDNode) {
     int isptr = (actualParameter->dataType == INT_PTR_TYPE || actualParameter->dataType == FLOAT_PTR_TYPE);
     if(formalParameter->type->kind == ARRAY_TYPE_DESCRIPTOR && !isptr) {
         printErrorMsgSpecial(actualParameter, getNameOfDataType(formalParameter->type->properties.arrayProperties.elementType==INT_TYPE?INT_PTR_TYPE:FLOAT_PTR_TYPE), PASS_SCALAR_TO_ARRAY);
@@ -556,7 +569,7 @@ void checkParameterPassing(Parameter* formalParameter, AST_NODE* actualParameter
     }
     else if(actualParameter->dataType == CONST_STRING_TYPE) {
         actualParameter->dataType = ERROR_TYPE;
-        printErrorMsg(actualParameter, PARAMETER_TYPE_UNMATCH);
+        printErrorMsg(funcIDNode, PARAMETER_TYPE_UNMATCH);
     }
 }
 
@@ -700,8 +713,8 @@ void processExprNode(AST_NODE* exprNode) {
     }
 }
 
-#define error(msg) printErrorMsg(idNode,msg),idNode->dataType=ERROR_TYPE
 void processVariableLValue(AST_NODE* idNode) {
+#define error(msg) printErrorMsg(idNode,msg),idNode->dataType=ERROR_TYPE
     SymbolTableEntry* entry=retrieveSymbol(idNode->semantic_value.identifierSemanticValue.identifierName);
     if(!entry){
         error(SYMBOL_UNDECLARED);
@@ -936,7 +949,7 @@ void declareFunction(AST_NODE* declarationNode) {
     AST_NODE *ret = declarationNode->child, *name = ret->rightSibling;
     int err = 0, enter=0;
     if(ret->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->kind == ARRAY_TYPE_DESCRIPTOR)
-        error(ret,RETURN_ARRAY);
+        error(name,RETURN_ARRAY);
     if(declaredLocally(name->semantic_value.identifierSemanticValue.identifierName)) error(name,FUNCTION_REDECLARE);
     SymbolAttribute* attr=(SymbolAttribute*)malloc(sizeof(SymbolAttribute));
     attr->attributeKind=FUNCTION_SIGNATURE;
