@@ -1,12 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
+//#include <assert.h>
 #include "header.h"
 #include "symbolTable.h"
 // This file is for reference only, you are not required to follow the implementation. //
 // You only need to check for errors stated in the hw4 document. //
 // TODO remove assert
+#define assert
 int g_anyErrorOccur = 0;
 
 DATA_TYPE getBiggerType(DATA_TYPE dataType1, DATA_TYPE dataType2);
@@ -130,9 +131,9 @@ DATA_TYPE getTypeOfSymbolTableEntry(SymbolTableEntry* entry) {
 
 void printErrorMsgSpecial(AST_NODE* node1, char* name2, ErrorMsgKind errorMsgKind) {
     g_anyErrorOccur = 1;
-    //printf("\033[01;31m");
-    printf("Error found in line %d: ", node1->linenumber);
-#define printf fprintf(stderr,"print error in line %d\n",__LINE__),printf("\033[01;31m"),printf
+    printf("\033[01;31mError\033[m found in line %d: ", node1->linenumber);
+    printf("\033[01;31m");
+//#define printf fprintf(stderr,"print error in line %d\n",__LINE__),printf("\033[01;31m"),printf
     switch(errorMsgKind) {
         case PASS_ARRAY_TO_SCALAR:
             printf("invalid conversion from \'%s\' to \'%s\'\n", \
@@ -152,12 +153,12 @@ void printErrorMsgSpecial(AST_NODE* node1, char* name2, ErrorMsgKind errorMsgKin
     }
 #undef printf
     printf("\033[m");
-    fprintf(stderr,"\033[m");
+    //fprintf(stderr,"\033[m");
 }
 
 void printWarningMsg(AST_NODE* node, WarningMsgKind warningMsgKind) {
     g_anyErrorOccur = 1;
-    printf("Warning found in line %d: ", node->linenumber);
+    printf("\033[01;35mWarning\033[m found in line %d: ", node->linenumber);
     printf("\033[01;35m");
     switch(warningMsgKind) {
         case DIVIDE_BY_ZERO:
@@ -178,10 +179,10 @@ void printWarningMsg(AST_NODE* node, WarningMsgKind warningMsgKind) {
 
 void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
     g_anyErrorOccur = 1;
-    //printf("\033[01;31m");
-    printf("Error found in line %d: ", node->linenumber);
+    printf("\033[01;31mError\033[m found in line %d: ", node->linenumber);
+    printf("\033[01;31m");
 /* TODO remove debug message */
-#define printf fprintf(stderr,"print error in line %d\n",__LINE__),printf("\033[01;31m"),printf
+//#define printf fprintf(stderr,"print error in line %d\n",__LINE__),printf("\033[01;31m"),printf
     switch(errorMsgKind) {
         case SYMBOL_IS_NOT_TYPE:
             printf("unknown type name '%s'\n", node->semantic_value.identifierSemanticValue.identifierName);
@@ -269,11 +270,11 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
             break;
     }
     printf("\033[m");
-    fprintf(stderr,"\033[m");
-#undef printf
+    //fprintf(stderr,"\033[m");
+//#undef printf
 }
 /* TODO debug message */
-#define printErrorMsg fprintf(stderr,"error line: %d\n",__LINE__),printErrorMsg
+//#define printErrorMsg fprintf(stderr,"error line: %d\n",__LINE__),printErrorMsg
 
 
 void semanticAnalysis(AST_NODE *root) {
