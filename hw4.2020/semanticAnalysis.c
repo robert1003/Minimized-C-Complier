@@ -391,29 +391,44 @@ void declareIdList(AST_NODE* declarationNode, SymbolAttributeKind isVariableOrTy
 
 void checkAssignOrExpr(AST_NODE* assignOrExprRelatedNode) {
     if(assignOrExprRelatedNode->nodeType == EXPR_NODE) processExprNode(assignOrExprRelatedNode);
-    else {
-        if(assignOrExprRelatedNode->semantic_value.stmtSemanticValue.kind == ASSIGN_STMT) checkAssignmentStmt(assignOrExprRelatedNode);
-        else if(assignOrExprRelatedNode->semantic_value.stmtSemanticValue.kind == FUNCTION_CALL_STMT) checkFunctionCall(assignOrExprRelatedNode);
-    }
+    else if(assignOrExprRelatedNode->nodeType == CONST_VALUE_NODE) processConstValueNode(assignOrExprRelatedNode);
+    else if(assignOrExprRelatedNode->semantic_value.stmtSemanticValue.kind == ASSIGN_STMT) checkAssignmentStmt(assignOrExprRelatedNode);
+    else if(assignOrExprRelatedNode->semantic_value.stmtSemanticValue.kind == FUNCTION_CALL_STMT) checkFunctionCall(assignOrExprRelatedNode);
 }
 
 void checkWhileStmt(AST_NODE* whileNode) {
     AST_NODE* condition = whileNode->child; checkAssignOrExpr(condition);
     if(condition->dataType == VOID_TYPE) {
-        condition->dataType = ERROR_TYPE;
+        whileNode->dataType = ERROR_TYPE;
         printErrorMsg(condition, PASS_VOID_TO_SCALAR);
+    }
+    else if(condition->dataType == CONST_STRING_TYPE) {
+        whileNode->dataType = ERROR_TYPE;
+        printErrorMsg(condition, STRING_OPERATION);
     }
     AST_NODE* stmt = condition->rightSibling; processStmtNode(stmt);
 }
 
 void checkForStmt(AST_NODE* forNode) {
     AST_NODE* assign = forNode->child; processGeneralNode(assign);
+    if(assign->dataType == CONST_STRING_TYPE) {
+        forNode->dataType = ERROR_TYPE;
+        printErrorMsg(assign, STRING_OPERATION);
+    }
     AST_NODE* condition = assign->rightSibling; processGeneralNode(condition);
     if(condition->dataType == VOID_TYPE) {
-        condition->dataType = ERROR_TYPE;
+        forNode->dataType = ERROR_TYPE;
         printErrorMsg(condition, PASS_VOID_TO_SCALAR);
     }
+    else if(condition->dataType == CONST_STRING_TYPE) {
+        forNode->dataType = ERROR_TYPE;
+        printErrorMsg(condition, STRING_OPERATION);
+    }
     AST_NODE* loop = condition->rightSibling; processGeneralNode(loop);
+    if(loop->dataType == CONST_STRING_TYPE) {
+        forNode->dataType = ERROR_TYPE;
+        printErrorMsg(loop, STRING_OPERATION);
+    }
     AST_NODE* stmt = loop->rightSibling; processStmtNode(stmt);
 }
 
@@ -439,8 +454,12 @@ void checkAssignmentStmt(AST_NODE* assignmentNode) {
 void checkIfStmt(AST_NODE* ifNode) {
     AST_NODE* condition = ifNode->child; checkAssignOrExpr(condition);
     if(condition->dataType == VOID_TYPE) {
-        condition->dataType = ERROR_TYPE;
+        ifNode->dataType = ERROR_TYPE;
         printErrorMsg(condition, PASS_VOID_TO_SCALAR);
+    }
+    else if(condition->dataType == CONST_STRING_TYPE) {
+        ifNode->dataType = ERROR_TYPE;
+        printErrorMsg(condition, STRING_OPERATION);
     }
     AST_NODE* stmt1 = condition->rightSibling; processStmtNode(stmt1); // if
     AST_NODE* stmt2 = condition->rightSibling; processStmtNode(stmt2); // else
