@@ -70,7 +70,9 @@ typedef enum ErrorMsgKind {
 } ErrorMsgKind;
 
 typedef enum WarningMsgKind {
-    DIVIDE_BY_ZERO
+    DIVIDE_BY_ZERO,
+    NON_VOID_RETURN_VOID,
+    VOID_RETURN_NON_VOID
 } WarningMsgKind;
 
 char* getNameOfDataType(DATA_TYPE type) {
@@ -135,6 +137,12 @@ void printWarningMsg(AST_NODE* node, WarningMsgKind warningMsgKind) {
         case DIVIDE_BY_ZERO:
             printf("division by zero\n");
             break;
+        case NON_VOID_RETURN_VOID:
+            printf("'return' with no value, in function returning non-void\n");
+            break;
+        case VOID_RETURN_NON_VOID:
+            printf("'return' with a value, in function returning void\n");
+            break;
         default:
             printf("Unhandled case in void printWarningMsg(AST_NODE* node, WarningMsgKind warningMsgKind)\n");
             break;
@@ -191,9 +199,6 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
             break;
         case TOO_MANY_ARGUMENTS:
             printf("too many arguments to function '%s'\n", node->semantic_value.identifierSemanticValue.identifierName);
-            break;
-        case RETURN_TYPE_UNMATCH:
-            // gcc: no warning generated
             break;
         case INCOMPATIBLE_ARRAY_DIMENSION:
             printf("subscripted value is neither array nor pointer nor vector\n");
@@ -780,19 +785,22 @@ void checkReturnStmt(AST_NODE* returnNode){
     }
     else{
         processExprRelatedNode(returnNode->child);
-        if(rettp!=returnNode->child->dataType){
-            if((rettp==INT_TYPE||rettp==FLOAT_TYPE)&&(returnNode->child->dataType==INT_TYPE||returnNode->child->dataType==FLOAT_TYPE))
-                errorflag=2;
-            else errorflag=1;
-        }
+
+        if(rettp == VOID_TYPE && returnNode->child->dataType != VOID_TYPE) errorflag = 2;
+        else if(rettp != VOID_TYPE && returnNode->child->dataType == VOID_TYPE) errorflag = 3;
     }
+    
     if(errorflag==1){
-        printErrorMsg(returnNode,RETURN_TYPE_UNMATCH);
-        returnNode->dataType=ERROR_TYPE;
-    }
-    else{
-        if(errorflag==2) /*TODO: warnning message*/;
+        printWarningMsg(returnNode, NON_VOID_RETURN_VOID);
         returnNode->dataType=rettp;
+    }
+    else if(errorflag==2){
+        printWarningMsg(returnNode, VOID_RETURN_NON_VOID);
+        returnNode->dataType=rettp;
+    }
+    else if(errorflag==3) {
+        printErrorMsg(returnNode, PASS_VOID_TO_SCALAR);
+        returnNode->dataType=ERROR_TYPE;
     }
 }
 
