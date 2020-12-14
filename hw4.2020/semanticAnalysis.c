@@ -220,6 +220,7 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
             break;
         case PASS_VOID_TO_SCALAR:
             printf("void value not ignored as it ought to be\n");
+            break;
         case UNARY_VOID:
             printf("invalid use of void expression\n");
             break;
@@ -703,7 +704,7 @@ void processVariableLValue(AST_NODE* idNode) {
             dim++;
             processExprRelatedNode(ptr);
             if(ptr->dataType==ERROR_TYPE) idNode->dataType=ERROR_TYPE;
-            else if(ptr->dataType==FLOAT_TYPE) error(ARRAY_SUBSCRIPT_NOT_INT);
+            else if(ptr->dataType==FLOAT_TYPE || ptr->dataType==VOID_TYPE) error(ARRAY_SUBSCRIPT_NOT_INT);
             ptr=ptr->rightSibling;
         }
         if(tpdes->kind==SCALAR_TYPE_DESCRIPTOR) error(NOT_ARRAY);
@@ -741,7 +742,7 @@ void processVariableRValue(AST_NODE* idNode) {
                 dim++;
                 processExprRelatedNode(ptr);
                 if(ptr->dataType==ERROR_TYPE) idNode->dataType=ERROR_TYPE;
-                else if(ptr->dataType==FLOAT_TYPE) error(ARRAY_SUBSCRIPT_NOT_INT);
+                else if(ptr->dataType==FLOAT_TYPE || ptr->dataType==VOID_TYPE) error(ARRAY_SUBSCRIPT_NOT_INT);
                 ptr=ptr->rightSibling;
             }
             if(idNode->dataType!=ERROR_TYPE){
