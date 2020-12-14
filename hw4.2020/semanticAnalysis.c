@@ -75,7 +75,33 @@ typedef enum WarningMsgKind {
     VOID_RETURN_NON_VOID
 } WarningMsgKind;
 
-char* getNameOfDataType(DATA_TYPE type) {
+char witbuf[15];
+char* wit(int n){
+    int t=13;
+    while(n){
+        witbuf[t--]=n%10+'0';
+        n/=10;
+    }
+    return witbuf+t+1;
+}
+
+void getDimensionOfArray(ArrayProperties *arp,char *buf){
+    int dim=arp->dimension,*ptr=arp->sizeInEachDimension;
+    for(int i=0;i<dim;i++){
+        if(i==0) strcpy(buf,"(*)"),buf+=3;
+        else{
+            *buf++='[';
+            char *tmpdim=wit(*ptr);
+            strcpy(buf,tmpdim); buf+=strlen(tmpdim);
+            *buf++=']';
+        }
+    }
+    *buf++=0;
+}
+
+char buf1[2000],buf2[2000],*buf=buf1,*pbuf=buf2;
+char* getNameOfDataType(DATA_TYPE type, ArrayProperties *arp=NULL) {
+    char *tmp=buf; buf=pbuf; pbuf=tmp;
     switch(type) {
         case INT_TYPE:
             return "int";
@@ -87,10 +113,14 @@ char* getNameOfDataType(DATA_TYPE type) {
             return "void";
             break;
         case INT_PTR_TYPE:
-            return "int*";
+            strcpy(buf,"int ");
+            getDimensionOfArray(arp,buf+4);
+            return buf;
             break;
         case FLOAT_PTR_TYPE:
-            return "float*";
+            strcpy(buf,"float ");
+            getDimensionOfArray(arp,buf+6);
+            return buf;
             break;
         default:
             printf("undefined %d\n", type);
