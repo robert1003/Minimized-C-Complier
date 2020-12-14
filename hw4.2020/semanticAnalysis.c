@@ -63,7 +63,8 @@ typedef enum ErrorMsgKind {
     ARRAY_SIZE_NEGATIVE,
     ARRAY_SUBSCRIPT_NOT_INT,
     PASS_ARRAY_TO_SCALAR,
-    PASS_SCALAR_TO_ARRAY
+    PASS_SCALAR_TO_ARRAY,
+    PASS_VOID_TO_SCALAR
 } ErrorMsgKind;
 
 typedef enum WarningMsgKind {
@@ -216,6 +217,9 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
         case ARRAY_SUBSCRIPT_NOT_INT:
             printf("array subscript is not an integer\n");
             break;
+        case PASS_VOID_TO_SCALAR:
+            printf("void value not ignored as it ought to be\n");
+            break;
         default:
             printf("Unhandled case in void printErrorMsg(AST_NODE* node, ERROR_MSG_KIND* errorMsgKind)\n");
             break;
@@ -327,10 +331,18 @@ void declareIdList(AST_NODE* declarationNode, SymbolAttributeKind isVariableOrTy
                         printErrorMsgSpecial(ptr->child, getNameOfDataType(tpdes->properties.dataType), PASS_ARRAY_TO_SCALAR);
                         ptr->dataType=ERROR_TYPE;
                     }
-                    else {
+                    else if(ptr->child->nodeType == IDENTIFIER_NODE) {
                         SymbolTableEntry* entry = retrieveSymbol(ptr->child->semantic_value.identifierSemanticValue.identifierName);
                         if(entry->attribute->attributeKind == FUNCTION_SIGNATURE) {
                             printErrorMsgSpecial(ptr->child, getNameOfDataType(tpdes->properties.dataType), PASS_FUNCTION_TO_SCALAR);
+                            ptr->dataType=ERROR_TYPE;
+                        }
+                    }
+                    else if(ptr->child->nodeType == STMT_NODE) {
+                        assert(ptr->child->semantic_value.stmtSemanticValue.kind == FUNCTION_CALL_STMT);
+                        SymbolTableEntry* entry = retrieveSymbol(ptr->child->child->semantic_value.identifierSemanticValue.identifierName);
+                        if(entry->attribute->attr.functionSignature->returnType == VOID_TYPE) {
+                            printErrorMsg(ptr->child, PASS_VOID_TO_SCALAR);
                             ptr->dataType=ERROR_TYPE;
                         }
                     }
@@ -387,12 +399,20 @@ void checkAssignOrExpr(AST_NODE* assignOrExprRelatedNode) {
 
 void checkWhileStmt(AST_NODE* whileNode) {
     AST_NODE* condition = whileNode->child; checkAssignOrExpr(condition);
+    if(condition->dataType == VOID_TYPE) {
+        condition->dataType = ERROR_TYPE;
+        printErrorMsg(condition, PASS_VOID_TO_SCALAR);
+    }
     AST_NODE* stmt = condition->rightSibling; processStmtNode(stmt);
 }
 
 void checkForStmt(AST_NODE* forNode) {
     AST_NODE* assign = forNode->child; processGeneralNode(assign);
     AST_NODE* condition = assign->rightSibling; processGeneralNode(condition);
+    if(condition->dataType == VOID_TYPE) {
+        condition->dataType = ERROR_TYPE;
+        printErrorMsg(condition, PASS_VOID_TO_SCALAR);
+    }
     AST_NODE* loop = condition->rightSibling; processGeneralNode(loop);
     AST_NODE* stmt = loop->rightSibling; processStmtNode(stmt);
 }
@@ -409,11 +429,19 @@ void checkAssignmentStmt(AST_NODE* assignmentNode) {
         assignmentNode->dataType = ERROR_TYPE;
         printErrorMsg(assignmentNode, STRING_OPERATION);
     }
+    else if(relop_expr->dataType == VOID_TYPE) {
+        assignmentNode->dataType = ERROR_TYPE;
+        printErrorMsg(assignmentNode, PASS_VOID_TO_SCALAR);
+    }
     else assignmentNode->dataType = getBiggerType(var_ref->dataType, relop_expr->dataType);
 }
 
 void checkIfStmt(AST_NODE* ifNode) {
     AST_NODE* condition = ifNode->child; checkAssignOrExpr(condition);
+    if(condition->dataType == VOID_TYPE) {
+        condition->dataType = ERROR_TYPE;
+        printErrorMsg(condition, PASS_VOID_TO_SCALAR);
+    }
     AST_NODE* stmt1 = condition->rightSibling; processStmtNode(stmt1); // if
     AST_NODE* stmt2 = condition->rightSibling; processStmtNode(stmt2); // else
 }
@@ -795,9 +823,10 @@ void processGeneralNode(AST_NODE *node) {
             else if(node->nodeType == NONEMPTY_ASSIGN_EXPR_LIST_NODE) checkAssignOrExpr(ptr);
             else if(node->nodeType == NONEMPTY_RELOP_EXPR_LIST_NODE) processExprRelatedNode(ptr);
             if(ptr->dataType == ERROR_TYPE) error=1;
+            node->dataType = ptr->dataType;
             ptr = ptr->rightSibling;
         }
-        if(error) node->nodeType=ERROR_TYPE;
+        if(error) node->dataType=ERROR_TYPE;
     }
     else if(node->nodeType == NUL_NODE) { /* do nothing */ }
     else {
