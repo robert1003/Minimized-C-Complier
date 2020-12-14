@@ -291,7 +291,7 @@ void declareIdList(AST_NODE* declarationNode, SymbolAttributeKind isVariableOrTy
                     break;
                 case WITH_INIT_ID:
                     attr->attr.typeDescriptor=tpdes;
-                    if((ptr->child->nodeType != CONST_VALUE_NODE) && (!declaredLocally(ptr->child->semantic_value.identifierSemanticValue.identifierName))) {
+                    if((ptr->child->nodeType != CONST_VALUE_NODE) && (!retrieveSymbol(ptr->child->semantic_value.identifierSemanticValue.identifierName))) {
                         printErrorMsg(ptr->child, SYMBOL_UNDECLARED);
                         ptr->dataType=ERROR_TYPE;
                     }
