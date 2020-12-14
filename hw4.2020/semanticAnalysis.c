@@ -64,7 +64,7 @@ typedef enum ErrorMsgKind {
     ARRAY_SUBSCRIPT_NOT_INT,
     PASS_ARRAY_TO_SCALAR,
     PASS_SCALAR_TO_ARRAY,
-    PASS_VOID_TO_SCALAR
+    PASS_VOID_TO_SCALAR,
     UNARY_VOID
 } ErrorMsgKind;
 
