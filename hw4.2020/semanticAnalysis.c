@@ -65,6 +65,7 @@ typedef enum ErrorMsgKind {
     PASS_ARRAY_TO_SCALAR,
     PASS_SCALAR_TO_ARRAY,
     PASS_VOID_TO_SCALAR
+    UNARY_VOID
 } ErrorMsgKind;
 
 typedef enum WarningMsgKind {
@@ -127,8 +128,8 @@ void printErrorMsgSpecial(AST_NODE* node1, char* name2, ErrorMsgKind errorMsgKin
 
 void printWarningMsg(AST_NODE* node, WarningMsgKind warningMsgKind) {
     g_anyErrorOccur = 1;
-    printf("\035[01;31m");
     printf("Warning found in line %d: ", node->linenumber);
+    printf("\033[01;35m");
     switch(warningMsgKind) {
         case DIVIDE_BY_ZERO:
             printf("division by zero\n");
@@ -219,6 +220,8 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
             break;
         case PASS_VOID_TO_SCALAR:
             printf("void value not ignored as it ought to be\n");
+        case UNARY_VOID:
+            printf("invalid use of void expression\n");
             break;
         default:
             printf("Unhandled case in void printErrorMsg(AST_NODE* node, ERROR_MSG_KIND* errorMsgKind)\n");
@@ -569,14 +572,20 @@ int evaluateExprValue(AST_NODE* exprNode) {
         if(lc->dataType == INT_TYPE && rc->dataType == INT_TYPE) {
             exprNode->dataType = INT_TYPE;
             int lv, rv; getExprOrConstValue(lc, &lv, NULL); getExprOrConstValue(rc, &rv, NULL);
-            if(exprNode->semantic_value.exprSemanticValue.op.binaryOp==BINARY_OP_DIV&&rv==0) return 0;
+            if(exprNode->semantic_value.exprSemanticValue.op.binaryOp==BINARY_OP_DIV&&rv==0){
+                printWarningMsg(exprNode,DIVIDE_BY_ZERO);
+                return 0;
+            }
             int vals[]={lv+rv,lv-rv,lv*rv,lv/rv,lv==rv,lv>=rv,lv<=rv,lv!=rv,lv>rv,lv<rv,lv&&rv,lv||rv};
             exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue=vals[exprNode->semantic_value.exprSemanticValue.op.binaryOp];
         }
         else {
             exprNode->dataType = FLOAT_TYPE;
             float lv, rv; getExprOrConstValue(lc, NULL, &lv); getExprOrConstValue(rc, NULL, &rv);
-            if(exprNode->semantic_value.exprSemanticValue.op.binaryOp==BINARY_OP_DIV&&rv==0) return 0;
+            if(exprNode->semantic_value.exprSemanticValue.op.binaryOp==BINARY_OP_DIV&&rv==0){
+                printWarningMsg(exprNode,DIVIDE_BY_ZERO);
+                return 0;
+            }
             float vals[]={lv+rv,lv-rv,lv*rv,lv/rv,lv==rv,lv>=rv,lv<=rv,lv!=rv,lv>rv,lv<rv,lv&&rv,lv||rv};
             exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue=vals[exprNode->semantic_value.exprSemanticValue.op.binaryOp];
         }
@@ -592,7 +601,6 @@ int evaluateExprValue(AST_NODE* exprNode) {
                     break;
                 case UNARY_OP_NEGATIVE:
                     exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue = -rv;
-                    printf("%d\n",exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue);
                     break;
                 case UNARY_OP_LOGICAL_NEGATION:
                     exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue = !rv;
@@ -635,12 +643,15 @@ void processExprNode(AST_NODE* exprNode) {
             printErrorMsg(exprNode, STRING_OPERATION);
         }
         else if(lc->dataType == ERROR_TYPE || rc->dataType == ERROR_TYPE) exprNode->dataType = ERROR_TYPE;
+        else if(lc->dataType==VOID_TYPE||rc->dataType==VOID_TYPE){
+            printErrorMsg(exprNode,PASS_VOID_TO_SCALAR);
+            exprNode->dataType=ERROR_TYPE;
+        }
         else {
             exprNode->dataType = getBiggerType(lc->dataType, rc->dataType);
             if((lc->nodeType == CONST_VALUE_NODE || (lc->nodeType == EXPR_NODE && lc->semantic_value.exprSemanticValue.isConstEval)) && \
                 (rc->nodeType == CONST_VALUE_NODE || (rc->nodeType == EXPR_NODE && rc->semantic_value.exprSemanticValue.isConstEval))) {
                     exprNode->semantic_value.exprSemanticValue.isConstEval = evaluateExprValue(exprNode);
-                    printf("\033[01;41m%d %d\033[m\n",exprNode->semantic_value.exprSemanticValue.isConstEval,exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue);
                 }
         }
     }
@@ -655,11 +666,14 @@ void processExprNode(AST_NODE* exprNode) {
             printErrorMsg(exprNode, STRING_OPERATION);
         }
         else if(rc->dataType == ERROR_TYPE) exprNode->dataType = ERROR_TYPE;
+        else if(rc->dataType==VOID_TYPE){
+            printErrorMsg(exprNode,UNARY_VOID);
+            exprNode->dataType=ERROR_TYPE;
+        }
         else {
             exprNode->dataType = rc->dataType;
             if(rc->nodeType == CONST_VALUE_NODE || (rc->nodeType == EXPR_NODE && rc->semantic_value.exprSemanticValue.isConstEval)) {
                 exprNode->semantic_value.exprSemanticValue.isConstEval = evaluateExprValue(exprNode);
-                printf("\033[01;41m%d %d\033[m\n",exprNode->semantic_value.exprSemanticValue.isConstEval,exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue);
             }
         }
     }

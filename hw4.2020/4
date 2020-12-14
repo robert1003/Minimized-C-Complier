@@ -1,0 +1,6 @@
+void f(){}
+int main(){
+    int a=-f;
+    int a=1+f;
+    int a,c=a+f();
+}
