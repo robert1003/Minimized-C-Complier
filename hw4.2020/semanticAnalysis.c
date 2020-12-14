@@ -34,7 +34,7 @@ void processVariableLValue(AST_NODE* idNode);
 void processVariableRValue(AST_NODE* idNode);
 void processConstValueNode(AST_NODE* constValueNode);
 void getExprOrConstValue(AST_NODE* exprOrConstNode, int* iValue, float* fValue);
-void evaluateExprValue(AST_NODE* exprNode);
+int evaluateExprValue(AST_NODE* exprNode);
 
 typedef enum ErrorMsgKind {
     SYMBOL_IS_NOT_TYPE,
@@ -479,21 +479,23 @@ void getExprOrConstValue(AST_NODE* exprOrConstNode, int* iValue, float* fValue) 
     else if(exprOrConstNode->nodeType == CONST_VALUE_NODE && exprOrConstNode->dataType == FLOAT_TYPE) *fValue = exprOrConstNode->semantic_value.const1->const_u.fval;
     else if(exprOrConstNode->nodeType == EXPR_NODE && exprOrConstNode->dataType == INT_TYPE) *iValue = exprOrConstNode->semantic_value.exprSemanticValue.constEvalValue.iValue;
     else if(exprOrConstNode->nodeType == EXPR_NODE && exprOrConstNode->dataType == FLOAT_TYPE) *fValue = exprOrConstNode->semantic_value.exprSemanticValue.constEvalValue.fValue;
-    assert(0);
+    else assert(0);
 }
 
-void evaluateExprValue(AST_NODE* exprNode) {
+int evaluateExprValue(AST_NODE* exprNode) {
     if(exprNode->semantic_value.exprSemanticValue.kind == BINARY_OPERATION) {
         AST_NODE *lc = exprNode->child, *rc = lc->rightSibling;
         if(lc->dataType == INT_TYPE && rc->dataType == INT_TYPE) {
             exprNode->dataType = INT_TYPE;
             int lv, rv; getExprOrConstValue(lc, &lv, NULL); getExprOrConstValue(rc, &rv, NULL);
+            if(exprNode->semantic_value.exprSemanticValue.op.binaryOp==BINARY_OP_DIV&&rv==0) return 0;
             int vals[]={lv+rv,lv-rv,lv*rv,lv/rv,lv==rv,lv>=rv,lv<=rv,lv!=rv,lv>rv,lv<rv,lv&&rv,lv||rv};
             exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue=vals[exprNode->semantic_value.exprSemanticValue.op.binaryOp];
         }
         else {
             exprNode->dataType = FLOAT_TYPE;
             float lv, rv; getExprOrConstValue(lc, NULL, &lv); getExprOrConstValue(rc, NULL, &rv);
+            if(exprNode->semantic_value.exprSemanticValue.op.binaryOp==BINARY_OP_DIV&&rv==0) return 0;
             float vals[]={lv+rv,lv-rv,lv*rv,lv/rv,lv==rv,lv>=rv,lv<=rv,lv!=rv,lv>rv,lv<rv,lv&&rv,lv||rv};
             exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue=vals[exprNode->semantic_value.exprSemanticValue.op.binaryOp];
         }
@@ -502,13 +504,14 @@ void evaluateExprValue(AST_NODE* exprNode) {
         AST_NODE* rc = exprNode->child;
         if(rc->dataType == INT_TYPE) {
             exprNode->dataType = INT_TYPE;
-            int rv; getExprOrConstValue(exprNode, &rv, NULL);
+            int rv; getExprOrConstValue(rc, &rv, NULL);
             switch(exprNode->semantic_value.exprSemanticValue.op.unaryOp) {
                 case UNARY_OP_POSITIVE:
                     exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue = +rv;
                     break;
                 case UNARY_OP_NEGATIVE:
                     exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue = -rv;
+                    printf("%d\n",exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue);
                     break;
                 case UNARY_OP_LOGICAL_NEGATION:
                     exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue = !rv;
@@ -519,7 +522,7 @@ void evaluateExprValue(AST_NODE* exprNode) {
         }
         else {
             exprNode->dataType = FLOAT_TYPE;
-            float rv; getExprOrConstValue(exprNode, NULL, &rv);
+            float rv; getExprOrConstValue(rc, NULL, &rv);
             switch(exprNode->semantic_value.exprSemanticValue.op.unaryOp) {
                 case UNARY_OP_POSITIVE:
                     exprNode->semantic_value.exprSemanticValue.constEvalValue.fValue = +rv;
@@ -535,6 +538,7 @@ void evaluateExprValue(AST_NODE* exprNode) {
             }
         }
     }
+    return 1;
 }
 
 void processExprNode(AST_NODE* exprNode) {
@@ -552,10 +556,10 @@ void processExprNode(AST_NODE* exprNode) {
         else if(lc->dataType == ERROR_TYPE || rc->dataType == ERROR_TYPE) exprNode->dataType = ERROR_TYPE;
         else {
             exprNode->dataType = getBiggerType(lc->dataType, rc->dataType);
-            if((lc->dataType == CONST_VALUE_NODE || (lc->dataType == EXPR_NODE && lc->semantic_value.exprSemanticValue.isConstEval)) && \
-                (rc->dataType == CONST_VALUE_NODE || (rc->dataType == EXPR_NODE && rc->semantic_value.exprSemanticValue.isConstEval))) {
-                    evaluateExprValue(exprNode);
-                    exprNode->semantic_value.exprSemanticValue.isConstEval = 1;
+            if((lc->nodeType == CONST_VALUE_NODE || (lc->nodeType == EXPR_NODE && lc->semantic_value.exprSemanticValue.isConstEval)) && \
+                (rc->nodeType == CONST_VALUE_NODE || (rc->nodeType == EXPR_NODE && rc->semantic_value.exprSemanticValue.isConstEval))) {
+                    exprNode->semantic_value.exprSemanticValue.isConstEval = evaluateExprValue(exprNode);
+                    printf("\033[01;41m%d %d\033[m\n",exprNode->semantic_value.exprSemanticValue.isConstEval,exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue);
                 }
         }
     }
@@ -572,9 +576,9 @@ void processExprNode(AST_NODE* exprNode) {
         else if(rc->dataType == ERROR_TYPE) exprNode->dataType = ERROR_TYPE;
         else {
             exprNode->dataType = rc->dataType;
-            if(rc->dataType == CONST_VALUE_NODE || (rc->dataType == EXPR_NODE && rc->semantic_value.exprSemanticValue.isConstEval)) {
-                evaluateExprValue(exprNode);
-                exprNode->semantic_value.exprSemanticValue.isConstEval = 1;
+            if(rc->nodeType == CONST_VALUE_NODE || (rc->nodeType == EXPR_NODE && rc->semantic_value.exprSemanticValue.isConstEval)) {
+                exprNode->semantic_value.exprSemanticValue.isConstEval = evaluateExprValue(exprNode);
+                printf("\033[01;41m%d %d\033[m\n",exprNode->semantic_value.exprSemanticValue.isConstEval,exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue);
             }
         }
     }

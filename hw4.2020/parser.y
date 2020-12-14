@@ -394,7 +394,12 @@ cfactor:	CONST
                     $$ = Allocate(CONST_VALUE_NODE);
                     $$->semantic_value.const1 = $1;
                 }
-            |MK_LPAREN cexpr MK_RPAREN 
+            | OP_MINUS cfactor
+                {
+                    $$ = makeExprNode(UNARY_OPERATION,UNARY_OP_NEGATIVE);
+                    makeFamily($$,1,$2);
+                }
+            | MK_LPAREN cexpr MK_RPAREN 
                 {
                     $$ = $2;
                 }
