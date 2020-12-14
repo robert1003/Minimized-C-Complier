@@ -66,6 +66,10 @@ typedef enum ErrorMsgKind {
     PASS_SCALAR_TO_ARRAY
 } ErrorMsgKind;
 
+typedef enum WarningMsgKind {
+    DIVIDE_BY_ZERO
+} WarningMsgKind;
+
 char* getNameOfDataType(DATA_TYPE type) {
     switch(type) {
         case INT_TYPE:
@@ -118,6 +122,21 @@ void printErrorMsgSpecial(AST_NODE* node1, char* name2, ErrorMsgKind errorMsgKin
 #undef printf
     printf("\033[m");
     fprintf(stderr,"\033[m");
+}
+
+void printWarningMsg(AST_NODE* node, WarningMsgKind warningMsgKind) {
+    g_anyErrorOccur = 1;
+    printf("\035[01;31m");
+    printf("Warning found in line %d: ", node->linenumber);
+    switch(warningMsgKind) {
+        case DIVIDE_BY_ZERO:
+            printf("division by zero\n");
+            break;
+        default:
+            printf("Unhandled case in void printWarningMsg(AST_NODE* node, WarningMsgKind warningMsgKind)\n");
+            break;
+    }
+    printf("\033[m");
 }
 
 void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
