@@ -1,4 +1,4 @@
 void f(){}
 int main(){
-    int c=f();
+    int a,c=a+f();
 }
