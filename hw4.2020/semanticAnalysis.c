@@ -65,7 +65,8 @@ typedef enum ErrorMsgKind {
     PASS_ARRAY_TO_SCALAR,
     PASS_SCALAR_TO_ARRAY,
     PASS_VOID_TO_SCALAR,
-    UNARY_VOID
+    UNARY_VOID,
+    FUNCTION_NOT_RVALUE
 } ErrorMsgKind;
 
 typedef enum WarningMsgKind {
@@ -223,6 +224,9 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
             break;
         case UNARY_VOID:
             printf("invalid use of void expression\n");
+            break;
+        case FUNCTION_NOT_RVALUE:
+            printf("function name cannot be used as rvalue\n");
             break;
         default:
             printf("Unhandled case in void printErrorMsg(AST_NODE* node, ERROR_MSG_KIND* errorMsgKind)\n");
@@ -395,44 +399,29 @@ void declareIdList(AST_NODE* declarationNode, SymbolAttributeKind isVariableOrTy
 
 void checkAssignOrExpr(AST_NODE* assignOrExprRelatedNode) {
     if(assignOrExprRelatedNode->nodeType == EXPR_NODE) processExprNode(assignOrExprRelatedNode);
-    else if(assignOrExprRelatedNode->nodeType == CONST_VALUE_NODE) processConstValueNode(assignOrExprRelatedNode);
-    else if(assignOrExprRelatedNode->semantic_value.stmtSemanticValue.kind == ASSIGN_STMT) checkAssignmentStmt(assignOrExprRelatedNode);
-    else if(assignOrExprRelatedNode->semantic_value.stmtSemanticValue.kind == FUNCTION_CALL_STMT) checkFunctionCall(assignOrExprRelatedNode);
+    else {
+        if(assignOrExprRelatedNode->semantic_value.stmtSemanticValue.kind == ASSIGN_STMT) checkAssignmentStmt(assignOrExprRelatedNode);
+        else if(assignOrExprRelatedNode->semantic_value.stmtSemanticValue.kind == FUNCTION_CALL_STMT) checkFunctionCall(assignOrExprRelatedNode);
+    }
 }
 
 void checkWhileStmt(AST_NODE* whileNode) {
     AST_NODE* condition = whileNode->child; checkAssignOrExpr(condition);
     if(condition->dataType == VOID_TYPE) {
-        whileNode->dataType = ERROR_TYPE;
+        condition->dataType = ERROR_TYPE;
         printErrorMsg(condition, PASS_VOID_TO_SCALAR);
-    }
-    else if(condition->dataType == CONST_STRING_TYPE) {
-        whileNode->dataType = ERROR_TYPE;
-        printErrorMsg(condition, STRING_OPERATION);
     }
     AST_NODE* stmt = condition->rightSibling; processStmtNode(stmt);
 }
 
 void checkForStmt(AST_NODE* forNode) {
     AST_NODE* assign = forNode->child; processGeneralNode(assign);
-    if(assign->dataType == CONST_STRING_TYPE) {
-        forNode->dataType = ERROR_TYPE;
-        printErrorMsg(assign, STRING_OPERATION);
-    }
     AST_NODE* condition = assign->rightSibling; processGeneralNode(condition);
     if(condition->dataType == VOID_TYPE) {
-        forNode->dataType = ERROR_TYPE;
+        condition->dataType = ERROR_TYPE;
         printErrorMsg(condition, PASS_VOID_TO_SCALAR);
     }
-    else if(condition->dataType == CONST_STRING_TYPE) {
-        forNode->dataType = ERROR_TYPE;
-        printErrorMsg(condition, STRING_OPERATION);
-    }
     AST_NODE* loop = condition->rightSibling; processGeneralNode(loop);
-    if(loop->dataType == CONST_STRING_TYPE) {
-        forNode->dataType = ERROR_TYPE;
-        printErrorMsg(loop, STRING_OPERATION);
-    }
     AST_NODE* stmt = loop->rightSibling; processStmtNode(stmt);
 }
 
@@ -458,12 +447,8 @@ void checkAssignmentStmt(AST_NODE* assignmentNode) {
 void checkIfStmt(AST_NODE* ifNode) {
     AST_NODE* condition = ifNode->child; checkAssignOrExpr(condition);
     if(condition->dataType == VOID_TYPE) {
-        ifNode->dataType = ERROR_TYPE;
+        condition->dataType = ERROR_TYPE;
         printErrorMsg(condition, PASS_VOID_TO_SCALAR);
-    }
-    else if(condition->dataType == CONST_STRING_TYPE) {
-        ifNode->dataType = ERROR_TYPE;
-        printErrorMsg(condition, STRING_OPERATION);
     }
     AST_NODE* stmt1 = condition->rightSibling; processStmtNode(stmt1); // if
     AST_NODE* stmt2 = condition->rightSibling; processStmtNode(stmt2); // else
@@ -704,7 +689,7 @@ void processVariableLValue(AST_NODE* idNode) {
             dim++;
             processExprRelatedNode(ptr);
             if(ptr->dataType==ERROR_TYPE) idNode->dataType=ERROR_TYPE;
-            else if(ptr->dataType==FLOAT_TYPE || ptr->dataType==VOID_TYPE) error(ARRAY_SUBSCRIPT_NOT_INT);
+            else if(ptr->dataType==FLOAT_TYPE) error(ARRAY_SUBSCRIPT_NOT_INT);
             ptr=ptr->rightSibling;
         }
         if(tpdes->kind==SCALAR_TYPE_DESCRIPTOR) error(NOT_ARRAY);
@@ -727,6 +712,10 @@ void processVariableRValue(AST_NODE* idNode) {
         error(IS_TYPE_NOT_VARIABLE);
         return;
     }
+    else if(entry->attribute->attributeKind==FUNCTION_SIGNATURE){
+        error(FUNCTION_NOT_RVALUE);
+        return;
+    }
     TypeDescriptor* tpdes=idNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
     if(idNode->semantic_value.identifierSemanticValue.kind==NORMAL_ID){
         if(tpdes->kind==ARRAY_TYPE_DESCRIPTOR)
@@ -742,7 +731,7 @@ void processVariableRValue(AST_NODE* idNode) {
                 dim++;
                 processExprRelatedNode(ptr);
                 if(ptr->dataType==ERROR_TYPE) idNode->dataType=ERROR_TYPE;
-                else if(ptr->dataType==FLOAT_TYPE || ptr->dataType==VOID_TYPE) error(ARRAY_SUBSCRIPT_NOT_INT);
+                else if(ptr->dataType==FLOAT_TYPE) error(ARRAY_SUBSCRIPT_NOT_INT);
                 ptr=ptr->rightSibling;
             }
             if(idNode->dataType!=ERROR_TYPE){
