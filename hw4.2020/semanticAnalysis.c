@@ -306,7 +306,7 @@ void declareIdList(AST_NODE* declarationNode, SymbolAttributeKind isVariableOrTy
     TypeDescriptor *tpdes=typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
     if(isVariableOrTypeAttribute==VARIABLE_ATTRIBUTE&&tpdes->kind==SCALAR_TYPE_DESCRIPTOR&&tpdes->properties.dataType==VOID_TYPE){
         printErrorMsg(typeNode,VOID_VARIABLE);
-        typeNode->dataType=ERROR_TYPE;
+        declarationNode->dataType=ERROR_TYPE;
         return;
     }
     AST_NODE* ptr=typeNode->rightSibling;
