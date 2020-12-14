@@ -27,7 +27,7 @@ op_plus         "+"
 op_minus        "-"
 op_times        "*"
 op_divide       "/"
-int_constant    {digit}+
+int_constant    "-"?{digit}+
 flt_constant    (({digit}*\.{digit}+|{digit}+\.)([eE][+-]?{digit}+)?)|({digit}+[eE][+-]?{digit}+)
 s-const         \"([^"\n])*\"
 comment	        "/*"(([^*])|([*]+[^/*]))*("*")+"/"
