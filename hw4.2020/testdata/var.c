@@ -4,13 +4,13 @@ int main(){
     a=5;
     {
         int aa;
-        aa=1;
+        aa=-1;
         a=aa;
         aa=a;
         {
             int aa,a;
             float a;
-            a=a*2+aa;
+            a=a*-2+aa;
         }
         {
         int aa;
