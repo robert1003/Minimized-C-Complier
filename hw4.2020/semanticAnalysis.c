@@ -100,7 +100,7 @@ void getDimensionOfArray(ArrayProperties *arp,char *buf){
 }
 
 char buf1[2000],buf2[2000],*buf=buf1,*pbuf=buf2;
-char* getNameOfDataType(DATA_TYPE type, ArrayProperties *arp=NULL) {
+char* getNameOfDataType(DATA_TYPE type) {
     char *tmp=buf; buf=pbuf; pbuf=tmp;
     switch(type) {
         case INT_TYPE:
@@ -113,14 +113,10 @@ char* getNameOfDataType(DATA_TYPE type, ArrayProperties *arp=NULL) {
             return "void";
             break;
         case INT_PTR_TYPE:
-            strcpy(buf,"int ");
-            getDimensionOfArray(arp,buf+4);
-            return buf;
+            return "int (*)";
             break;
         case FLOAT_PTR_TYPE:
-            strcpy(buf,"float ");
-            getDimensionOfArray(arp,buf+6);
-            return buf;
+            return "float (*)";
             break;
         default:
             printf("undefined %d\n", type);
