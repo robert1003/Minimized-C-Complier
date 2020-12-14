@@ -94,7 +94,9 @@ DATA_TYPE getTypeOfSymbolTableEntry(SymbolTableEntry* entry) {
 
 void printErrorMsgSpecial(AST_NODE* node1, char* name2, ErrorMsgKind errorMsgKind) {
     g_anyErrorOccur = 1;
-    printf("Error found in line %d\n", node1->linenumber);
+    //printf("\033[01;31m");
+    printf("Error found in line %d: ", node1->linenumber);
+#define printf fprintf(stderr,"print error in line %d\n",__LINE__),printf("\033[01;31m"),printf
     switch(errorMsgKind) {
         case PASS_ARRAY_TO_SCALAR:
             printf("invalid conversion from \'%s\' to \'%s\'\n", \
@@ -108,13 +110,17 @@ void printErrorMsgSpecial(AST_NODE* node1, char* name2, ErrorMsgKind errorMsgKin
             printf("Unhandled case in void printErrorMsg(AST_NODE* node, ERROR_MSG_KIND* errorMsgKind)\n");
             break;
     }
+#undef printf
+    printf("\033[m");
+    fprintf(stderr,"\033[m");
 }
 
 void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
     g_anyErrorOccur = 1;
-    printf("Error found in line %d\n", node->linenumber);
+    //printf("\033[01;31m");
+    printf("Error found in line %d: ", node->linenumber);
 /* TODO remove debug message */
-#define printf fprintf(stderr,"print error in line %d\n",__LINE__),printf
+#define printf fprintf(stderr,"print error in line %d\n",__LINE__),printf("\033[01;31m"),printf
     /* TODO IS_FUNCTION_NOT_VARIABLE is not handled */
     switch(errorMsgKind) {
         case SYMBOL_IS_NOT_TYPE:
@@ -190,6 +196,8 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
             printf("Unhandled case in void printErrorMsg(AST_NODE* node, ERROR_MSG_KIND* errorMsgKind)\n");
             break;
     }
+    printf("\033[m");
+    fprintf(stderr,"\033[m");
 #undef printf
 }
 /* TODO debug message */
