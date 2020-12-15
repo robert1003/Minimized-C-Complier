@@ -28,11 +28,11 @@
 
 ## Warning
 
-* Prompt *division by zero* when the results of a constant expression involves division by zero.
+* Prompt **division by zero** when the results of a constant expression involves division by zero.
   * `int main(){ int a=1/0; }`
-* Prompt *'return' with no value, in function returning non-void* when a non-void function returns nothing(void).
+* Prompt **'return' with no value, in function returning non-void** when a non-void function returns nothing(void).
   * `int f(){ return; }`
-* Prompt *'return' with a value, in function returning void* when a void function returns something non-void.
+* Prompt **'return' with a value, in function returning void** when a void function returns something non-void.
   * `void f(){ int a; return a; }`
 
 ## Optimization
