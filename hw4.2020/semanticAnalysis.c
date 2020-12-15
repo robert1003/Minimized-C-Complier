@@ -238,7 +238,7 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind) {
             printf("subscripted value is neither array nor pointer nor vector\n");
             break;
         case IS_TYPE_NOT_VARIABLE: // from gcc
-            printf("expected expected expression before '%s'\n", node->semantic_value.identifierSemanticValue.identifierName);
+            printf("expected expression before '%s'\n", node->semantic_value.identifierSemanticValue.identifierName);
             break;
         case STRING_OPERATION: // me
             printf("string operations are not supported\n");
