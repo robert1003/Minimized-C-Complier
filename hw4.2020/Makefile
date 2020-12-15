@@ -1,11 +1,11 @@
 TARGET = parser
 OBJECT = parser.tab.c parser.tab.o lex.yy.c alloc.o functions.o semanticAnalysis.o symbolTable.o
 OUTPUT = parser.output parser.tab.h
-CC = gcc-10 -g
+CC = gcc -g
 LEX = flex
-YACC = bison -v -Wcounterexamples
+YACC = bison -v
 YACCFLAG = -d
-LIBS = -L/usr/local/opt/flex/lib -I/usr/local/opt/flex/include -lfl
+LIBS = -lfl 
 
 parser: parser.tab.o alloc.o functions.o symbolTable.o semanticAnalysis.o 
 	$(CC) -o $(TARGET) parser.tab.o alloc.o functions.o symbolTable.o semanticAnalysis.o $(LIBS)
