@@ -15,6 +15,8 @@ int HASH(char * str) {
 	return (idx & (HASH_TABLE_SIZE-1));
 }
 
+SymbolTable symbolTable;
+
 SymbolTableEntry* newSymbolTableEntry(int nestingLevel)
 {
     SymbolTableEntry* symbolTableEntry = (SymbolTableEntry*)malloc(sizeof(SymbolTableEntry));

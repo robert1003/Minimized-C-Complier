@@ -37,6 +37,8 @@ void processConstValueNode(AST_NODE* constValueNode);
 void getExprOrConstValue(AST_NODE* exprOrConstNode, int* iValue, float* fValue);
 int evaluateExprValue(AST_NODE* exprNode);
 
+extern SymbolTable symbolTable;
+
 typedef enum ErrorMsgKind {
     SYMBOL_IS_NOT_TYPE,
     SYMBOL_REDECLARE,

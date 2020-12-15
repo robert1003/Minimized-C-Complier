@@ -91,8 +91,6 @@ typedef struct SymbolTable
     int scopeDisplayElementCount;
 } SymbolTable;
 
-SymbolTable symbolTable;
-
 void initializeSymbolTable();
 void symbolTableEnd();
 SymbolTableEntry* retrieveSymbol(char* symbolName);
