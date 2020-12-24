@@ -38,6 +38,7 @@ typedef enum ErrorMsgKind
     SYMBOL_IS_NOT_TYPE,
     SYMBOL_REDECLARE,
     SYMBOL_UNDECLARED,
+    CONFLICTING_TYPEDEF,
     NOT_FUNCTION_NAME,
     TRY_TO_INIT_ARRAY,
     EXCESSIVE_ARRAY_DIM_DECLARATION,
@@ -49,6 +50,7 @@ typedef enum ErrorMsgKind
     TOO_MANY_ARGUMENTS,
     RETURN_TYPE_UNMATCH,
     INCOMPATIBLE_ARRAY_DIMENSION,
+    SUBSCRIPT_NOT_POINTER,
     NOT_ASSIGNABLE,
     NOT_ARRAY,
     IS_TYPE_NOT_VARIABLE,
@@ -91,19 +93,23 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind)
     switch(errorMsgKind)
     {
     case SYMBOL_IS_NOT_TYPE:
-        printf("ID \'%s\' is not a type name.\n",
+        printf("unknown type name \'%s\'.\n",
             node->semantic_value.identifierSemanticValue.identifierName);
         break;
     case SYMBOL_REDECLARE:
-        printf("ID \'%s\' redeclared.\n", 
+        printf("redeclaration of \'%s\'.\n", 
+            node->semantic_value.identifierSemanticValue.identifierName);
+        break;
+    case CONFLICTING_TYPEDEF:
+        printf("conflicting types for \'%s\'.\n",
             node->semantic_value.identifierSemanticValue.identifierName);
         break;
     case SYMBOL_UNDECLARED:
-        printf("ID \'%s\' undeclared.\n", 
+        printf("\'%s\' was not declared in this scope.\n", 
             node->semantic_value.identifierSemanticValue.identifierName);
         break;
     case NOT_FUNCTION_NAME:
-        printf("ID \'%s\' is not a function.\n", 
+        printf("called object \'%s\' is not a function or a function pointer.\n", 
             node->semantic_value.identifierSemanticValue.identifierName);
         break;
     case TRY_TO_INIT_ARRAY:
@@ -120,33 +126,35 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind)
             node->rightSibling->semantic_value.identifierSemanticValue.identifierName);
         break;
     case VOID_VARIABLE:
-        printf("Type \'%s\' cannot be a variable's type.\n",
+        printf("variable \'%s\' declared void.\n",
             node->semantic_value.identifierSemanticValue.identifierName);
         break;
     case TYPEDEF_VOID_ARRAY:
-        printf("Declaration of \'%s\' as array of voids.\n",
+        printf("declaration of \'%s\' as array of voids.\n",
             node->semantic_value.identifierSemanticValue.identifierName);
         break;
     case PARAMETER_TYPE_UNMATCH:
         printf("Parameter is incompatible with parameter type.\n");
         break;
     case TOO_FEW_ARGUMENTS:
-        printf("too few arguments to function \'%s\'.\n",
+        printf("too few arguments to function \'%s\'\n",
             node->semantic_value.identifierSemanticValue.identifierName);
         break;
     case TOO_MANY_ARGUMENTS:
-        printf("too many arguments to function \'%s\'.\n",
+        printf("too many arguments to function \'%s\'\n",
             node->semantic_value.identifierSemanticValue.identifierName);
         break;
     case RETURN_TYPE_UNMATCH:
-        printf("Incompatible return type.\n");
+        printf("incompatible return type.\n");
         break;
     case INCOMPATIBLE_ARRAY_DIMENSION:
-        printf("Incompatible array dimensions.\n");
+        printf("incompatible array dimensions.\n");
+        break;
+    case SUBSCRIPT_NOT_POINTER:
+        printf("subscripted value is neither array nor pointer nor vector.\n");
         break;
     case NOT_ASSIGNABLE:
-        printf("ID \'%s\' is not assignable.\n",
-            node->semantic_value.identifierSemanticValue.identifierName);
+        printf("assignment to expression with array type.\n");
         break;
     case NOT_ARRAY:
         printf("ID \'%s\' is not array.\n",
@@ -164,15 +172,15 @@ void printErrorMsg(AST_NODE* node, ErrorMsgKind errorMsgKind)
         printf("String operation is unsupported.\n");
         break;
     case ARRAY_SIZE_NOT_INT:
-        printf("Size of array \'%s\' has non-integer type.\n",
+        printf("size of array \'%s\' has non-integer type.\n",
             node->semantic_value.identifierSemanticValue.identifierName);
         break;
     case ARRAY_SIZE_NEGATIVE:
-        printf("Size of array \'%s\' is negative.\n",
+        printf("size of array \'%s\' is negative.\n",
             node->semantic_value.identifierSemanticValue.identifierName);
         break;
     case ARRAY_SUBSCRIPT_NOT_INT:
-        printf("Array subscript is not an integer.\n");
+        printf("array subscript is not an integer.\n");
         break;
     default:
         printf("Unhandled case in void printErrorMsg(AST_NODE* node, ERROR_MSG_KIND* errorMsgKind)\n");
@@ -282,6 +290,23 @@ void processTypeNode(AST_NODE* idNodeAsType)
     }
 }
 
+int allowRedeclaration(SymbolAttribute *attr1, SymbolAttribute *attr2) {
+    if (attr1->attributeKind != TYPE_ATTRIBUTE || attr2->attributeKind != TYPE_ATTRIBUTE) return 0;
+    TypeDescriptor *type1 = attr1->attr.typeDescriptor;
+    TypeDescriptor *type2 = attr2->attr.typeDescriptor;
+    if (type1->kind != type2->kind) return 0;
+    if (type1->kind == SCALAR_TYPE_DESCRIPTOR) {
+        return type1->properties.dataType == type2->properties.dataType;
+    }
+    ArrayProperties *prop1 = &type1->properties.arrayProperties;
+    ArrayProperties *prop2 = &type2->properties.arrayProperties;
+    if (prop1->elementType != prop2->elementType) return 0;
+    if (prop1->dimension != prop2->dimension) return 0;
+    for (int i = 0; i < prop1->dimension; ++i) {
+        if (prop1->sizeInEachDimension[i] != prop2->sizeInEachDimension[i]) return 0;
+    }
+    return 1;
+}
 
 void declareIdList(AST_NODE* declarationNode, SymbolAttributeKind isVariableOrTypeAttribute, int ignoreArrayFirstDimSize)
 {
@@ -291,105 +316,108 @@ void declareIdList(AST_NODE* declarationNode, SymbolAttributeKind isVariableOrTy
        (typeDescriptorOfTypeNode->kind == SCALAR_TYPE_DESCRIPTOR) &&
        (typeDescriptorOfTypeNode->properties.dataType == VOID_TYPE))
     {
-        printErrorMsg(typeNode, VOID_VARIABLE);
+        printErrorMsg(typeNode->rightSibling, VOID_VARIABLE);
         typeNode->dataType = ERROR_TYPE;
         return;
     }
     AST_NODE* traverseIDList = typeNode->rightSibling;
     while(traverseIDList)
     {
-        if(declaredLocally(traverseIDList->semantic_value.identifierSemanticValue.identifierName))
+        SymbolAttribute* attribute = (SymbolAttribute*)malloc(sizeof(SymbolAttribute));
+        attribute->attributeKind = isVariableOrTypeAttribute;
+        switch(traverseIDList->semantic_value.identifierSemanticValue.kind)
         {
-            printErrorMsg(traverseIDList, SYMBOL_REDECLARE);
-            traverseIDList->dataType = ERROR_TYPE;
-            declarationNode->dataType = ERROR_TYPE;
-        }
-        else
-        {
-            SymbolAttribute* attribute = (SymbolAttribute*)malloc(sizeof(SymbolAttribute));
-            attribute->attributeKind = isVariableOrTypeAttribute;
-            switch(traverseIDList->semantic_value.identifierSemanticValue.kind)
+        case NORMAL_ID:
+            attribute->attr.typeDescriptor = typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
+            break;
+        case ARRAY_ID:
+            if((isVariableOrTypeAttribute == TYPE_ATTRIBUTE) && 
+               (typeDescriptorOfTypeNode->kind == SCALAR_TYPE_DESCRIPTOR) &&
+               (typeDescriptorOfTypeNode->properties.dataType == VOID_TYPE))
             {
-            case NORMAL_ID:
-                attribute->attr.typeDescriptor = typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
+                printErrorMsg(traverseIDList, TYPEDEF_VOID_ARRAY);
+                traverseIDList->dataType = ERROR_TYPE;
+                declarationNode->dataType = ERROR_TYPE;
                 break;
-            case ARRAY_ID:
-                if((isVariableOrTypeAttribute == TYPE_ATTRIBUTE) && 
-                   (typeDescriptorOfTypeNode->kind == SCALAR_TYPE_DESCRIPTOR) &&
-                   (typeDescriptorOfTypeNode->properties.dataType == VOID_TYPE))
+            }
+            attribute->attr.typeDescriptor = (TypeDescriptor*)malloc(sizeof(TypeDescriptor));
+            processDeclDimList(traverseIDList, attribute->attr.typeDescriptor, ignoreArrayFirstDimSize);
+            if(traverseIDList->dataType == ERROR_TYPE)
+            {
+                free(attribute->attr.typeDescriptor);
+                declarationNode->dataType = ERROR_TYPE;
+            }
+            else if(typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->kind == SCALAR_TYPE_DESCRIPTOR)
+            {
+                attribute->attr.typeDescriptor->properties.arrayProperties.elementType = 
+                    typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->properties.dataType;
+            }
+            else if(typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->kind == ARRAY_TYPE_DESCRIPTOR)
+            {
+                int typeArrayDimension = typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->properties.arrayProperties.dimension;
+                int idArrayDimension = attribute->attr.typeDescriptor->properties.arrayProperties.dimension;
+                if((typeArrayDimension + idArrayDimension) > MAX_ARRAY_DIMENSION)
                 {
-                    printErrorMsg(traverseIDList, TYPEDEF_VOID_ARRAY);
-                    traverseIDList->dataType = ERROR_TYPE;
-                    declarationNode->dataType = ERROR_TYPE;
-                    break;
-                }
-                attribute->attr.typeDescriptor = (TypeDescriptor*)malloc(sizeof(TypeDescriptor));
-                processDeclDimList(traverseIDList, attribute->attr.typeDescriptor, ignoreArrayFirstDimSize);
-                if(traverseIDList->dataType == ERROR_TYPE)
-                {
+                    printErrorMsg(traverseIDList, EXCESSIVE_ARRAY_DIM_DECLARATION);
                     free(attribute->attr.typeDescriptor);
-                    declarationNode->dataType = ERROR_TYPE;
-                }
-                else if(typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->kind == SCALAR_TYPE_DESCRIPTOR)
-                {
-                    attribute->attr.typeDescriptor->properties.arrayProperties.elementType = 
-                        typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->properties.dataType;
-                }
-                else if(typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->kind == ARRAY_TYPE_DESCRIPTOR)
-                {
-                    int typeArrayDimension = typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->properties.arrayProperties.dimension;
-                    int idArrayDimension = attribute->attr.typeDescriptor->properties.arrayProperties.dimension;
-                    if((typeArrayDimension + idArrayDimension) > MAX_ARRAY_DIMENSION)
-                    {
-                        printErrorMsg(traverseIDList, EXCESSIVE_ARRAY_DIM_DECLARATION);
-                        free(attribute->attr.typeDescriptor);
-                        traverseIDList->dataType = ERROR_TYPE;
-                        declarationNode->dataType = ERROR_TYPE;
-                    }
-                    else
-                    {
-                        attribute->attr.typeDescriptor->properties.arrayProperties.elementType = 
-                            typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->properties.arrayProperties.elementType;
-                        attribute->attr.typeDescriptor->properties.arrayProperties.dimension = 
-                            typeArrayDimension + idArrayDimension;
-                        int indexType = 0;
-                        int indexId = 0;
-                        for(indexType = 0, indexId = idArrayDimension; indexId < idArrayDimension + typeArrayDimension; ++indexType, ++indexId)
-                        {
-                            attribute->attr.typeDescriptor->properties.arrayProperties.sizeInEachDimension[indexId] = 
-                                typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->properties.arrayProperties.sizeInEachDimension[indexType];
-                        }
-                    }
-                }
-                break;
-            case WITH_INIT_ID:
-                if(typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->kind == ARRAY_TYPE_DESCRIPTOR)
-                {
-                    printErrorMsg(traverseIDList, TRY_TO_INIT_ARRAY);
                     traverseIDList->dataType = ERROR_TYPE;
                     declarationNode->dataType = ERROR_TYPE;
                 }
                 else
                 {
-                    attribute->attr.typeDescriptor = typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
+                    attribute->attr.typeDescriptor->properties.arrayProperties.elementType = 
+                        typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->properties.arrayProperties.elementType;
+                    attribute->attr.typeDescriptor->properties.arrayProperties.dimension = 
+                        typeArrayDimension + idArrayDimension;
+                    int indexType = 0;
+                    int indexId = 0;
+                    for(indexType = 0, indexId = idArrayDimension; indexId < idArrayDimension + typeArrayDimension; ++indexType, ++indexId)
+                    {
+                        attribute->attr.typeDescriptor->properties.arrayProperties.sizeInEachDimension[indexId] = 
+                            typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->properties.arrayProperties.sizeInEachDimension[indexType];
+                    }
                 }
-                break;
-            default:
-                printf("Unhandle case in void declareIdList(AST_NODE* typeNode)\n");
-                traverseIDList->dataType = ERROR_TYPE;
-                declarationNode->dataType = ERROR_TYPE;
-                break;
             }
-            if(traverseIDList->dataType == ERROR_TYPE)
+            break;
+        case WITH_INIT_ID:
+            if(typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->kind == ARRAY_TYPE_DESCRIPTOR)
             {
-                free(attribute);
+                printErrorMsg(traverseIDList, TRY_TO_INIT_ARRAY);
+                traverseIDList->dataType = ERROR_TYPE;
                 declarationNode->dataType = ERROR_TYPE;
             }
             else
             {
-                traverseIDList->semantic_value.identifierSemanticValue.symbolTableEntry =
-                    enterSymbol(traverseIDList->semantic_value.identifierSemanticValue.identifierName, attribute);
+                attribute->attr.typeDescriptor = typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
             }
+            break;
+        default:
+            printf("Unhandle case in void declareIdList(AST_NODE* typeNode)\n");
+            traverseIDList->dataType = ERROR_TYPE;
+            declarationNode->dataType = ERROR_TYPE;
+            break;
+        }
+        if(traverseIDList->dataType == ERROR_TYPE)
+        {
+            free(attribute);
+            declarationNode->dataType = ERROR_TYPE;
+        }
+        else if(declaredLocally(traverseIDList->semantic_value.identifierSemanticValue.identifierName))
+        {
+            SymbolTableEntry* entry = retrieveSymbol(traverseIDList->semantic_value.identifierSemanticValue.identifierName);
+            SymbolAttribute *declAttr = entry->attribute;
+            if (!allowRedeclaration(declAttr, attribute)) {
+                if (attribute->attributeKind == TYPE_ATTRIBUTE) printErrorMsg(traverseIDList, CONFLICTING_TYPEDEF);
+                else printErrorMsg(traverseIDList, SYMBOL_REDECLARE);
+                traverseIDList->dataType = ERROR_TYPE;
+                declarationNode->dataType = ERROR_TYPE;
+            }
+            free(attribute);
+        }
+        else
+        {
+            traverseIDList->semantic_value.identifierSemanticValue.symbolTableEntry =
+                enterSymbol(traverseIDList->semantic_value.identifierSemanticValue.identifierName, attribute);
         }
         traverseIDList = traverseIDList->rightSibling;
     }
@@ -1073,7 +1101,7 @@ void processVariableRValue(AST_NODE* idNode)
                 }
                 else if(dimension > typeDescriptor->properties.arrayProperties.dimension)
                 {
-                    printErrorMsg(idNode, INCOMPATIBLE_ARRAY_DIMENSION);
+                    printErrorMsg(idNode, SUBSCRIPT_NOT_POINTER);
                     idNode->dataType = ERROR_TYPE;
                 }
                 else if(typeDescriptor->properties.arrayProperties.elementType == INT_TYPE)

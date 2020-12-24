@@ -2,7 +2,6 @@
 #define __SYMBOL_TABLE_H__
 
 #include "header.h"
-// This file is for reference only, you are not required to follow the implementation. //
 
 
 //SYMBOL_TABLE_PREINSERT_NAME
@@ -96,12 +95,10 @@ typedef struct SymbolTable
 void initializeSymbolTable();
 void symbolTableEnd();
 SymbolTableEntry* retrieveSymbol(char* symbolName);
-SymbolTableEntry* InsertSymbol(char* symbolName, SymbolAttribute* attribute);
+SymbolTableEntry* enterSymbol(char* symbolName, SymbolAttribute* attribute);
 void removeSymbol(char* symbolName);
 int declaredLocally(char* symbolName);
 void openScope();
 void closeScope();
-SymbolAttribute* createAttrType(SymbolAttributeKind attrKind, TypeDescriptorKind tdKind, DATA_TYPE type);
-SymbolAttribute* createAttrFunc(SymbolAttributeKind attrKind, DATA_TYPE type);
 
 #endif
