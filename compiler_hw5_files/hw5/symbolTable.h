@@ -2,6 +2,7 @@
 #define __SYMBOL_TABLE_H__
 
 #include "header.h"
+// This file is for reference only, you are not required to follow the implementation. //
 
 
 //SYMBOL_TABLE_PREINSERT_NAME
@@ -11,7 +12,6 @@
 #define SYMBOL_TABLE_SYS_LIB_READ "read"
 #define SYMBOL_TABLE_SYS_LIB_FREAD "fread"
 #define HASH_TABLE_SIZE 256
-
 
 typedef enum SymbolAttributeKind
 {
@@ -90,7 +90,6 @@ typedef struct SymbolTable
     int currentLevel;
     int scopeDisplayElementCount;
 } SymbolTable;
-
 
 void initializeSymbolTable();
 void symbolTableEnd();
