@@ -253,8 +253,8 @@ void genBlockNode(AST_NODE* blockNode) {
         genGeneralNode(ptr);
         ptr = ptr->rightSibling;
     }
-    flush_regs();
     closeScope();
+    flush_regs();
 }
 void genStmtNode(AST_NODE* stmtNode) {
     if(stmtNode->nodeType == BLOCK_NODE) genBlockNode(stmtNode);
