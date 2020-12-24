@@ -79,7 +79,7 @@ typedef struct SymbolTableEntry
 
     char* name;
     SymbolAttribute* attribute;
-    int nestingLevel;
+    int nestingLevel,bindreg,offset;
 
 } SymbolTableEntry;
 

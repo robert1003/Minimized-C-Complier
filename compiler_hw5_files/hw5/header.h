@@ -156,6 +156,7 @@ struct AST_NODE {
 	AST_TYPE nodeType;
     DATA_TYPE dataType;
 	int linenumber;
+    int regnumber;
 	union {
         IdentifierSemanticValue identifierSemanticValue;
         STMTSemanticValue stmtSemanticValue;
@@ -168,5 +169,6 @@ typedef struct AST_NODE AST_NODE;
 
 AST_NODE *Allocate(AST_TYPE type);
 void semanticAnalysis(AST_NODE *root);
+void codegen(AST_NODE *root);
 
 #endif

@@ -502,7 +502,7 @@ void checkIfStmt(AST_NODE* ifNode) {
         printErrorMsg(condition, PASS_VOID_TO_SCALAR);
     }
     AST_NODE* stmt1 = condition->rightSibling; processStmtNode(stmt1); // if
-    AST_NODE* stmt2 = condition->rightSibling; processStmtNode(stmt2); // else
+    AST_NODE* stmt2 = stmt1->rightSibling; processStmtNode(stmt2); // else
 }
 
 void checkWriteFunction(AST_NODE* functionCallNode) {

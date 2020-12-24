@@ -172,6 +172,8 @@ void openScope() {
     }
 }
 
+extern void clear_reg(int i);
+
 void closeScope() {
     if(symbolTable.currentLevel < 0) {
         printf("trying to close a negative level\n");
@@ -185,6 +187,7 @@ void closeScope() {
         if(ptr->sameNameInOuterLevel) enterIntoHashChain(hashval, ptr->sameNameInOuterLevel);
         SymbolTableEntry* tmp = ptr;
         ptr = ptr->nextInSameLevel;
+        if(tmp->bindreg!=-1) clear_reg(tmp->bindreg);
         free(tmp);
     }
     symbolTable.scopeDisplay[symbolTable.currentLevel] = NULL;

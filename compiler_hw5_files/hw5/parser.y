@@ -10,7 +10,7 @@
 int linenumber = 1;
 AST_NODE *prog;
 
-extern int g_anyErrorOccur;
+int g_anyErrorOccur = 0;
 
 static inline AST_NODE* makeSibling(AST_NODE *a, AST_NODE *b)
 { 
@@ -753,6 +753,8 @@ char *argv[];
      initializeSymbolTable();
      
      semanticAnalysis(prog);
+
+     codegen(prog);
      
      symbolTableEnd();
      if (!g_anyErrorOccur) {

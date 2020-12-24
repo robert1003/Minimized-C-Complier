@@ -8,7 +8,7 @@
 // You only need to check for errors stated in the hw4 document. //
 // TODO remove assert
 #define assert
-int g_anyErrorOccur = 0;
+extern int g_anyErrorOccur;
 
 DATA_TYPE getBiggerType(DATA_TYPE dataType1, DATA_TYPE dataType2);
 void processProgramNode(AST_NODE *programNode);
@@ -502,7 +502,7 @@ void checkIfStmt(AST_NODE* ifNode) {
         printErrorMsg(condition, PASS_VOID_TO_SCALAR);
     }
     AST_NODE* stmt1 = condition->rightSibling; processStmtNode(stmt1); // if
-    AST_NODE* stmt2 = condition->rightSibling; processStmtNode(stmt2); // else
+    AST_NODE* stmt2 = stmt1->rightSibling; processStmtNode(stmt2); // else
 }
 
 void checkWriteFunction(AST_NODE* functionCallNode) {
