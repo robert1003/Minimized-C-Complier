@@ -9,12 +9,14 @@
 // TODO remove assert
 #define assert
 extern int g_anyErrorOccur;
+extern DATA_TYPE getTypeOfSymbolTableEntry(SymbolTableEntry*);
 
 DATA_TYPE getBiggerType(DATA_TYPE dataType1, DATA_TYPE dataType2);
 void genProgramNode(AST_NODE *programNode);
 void genDeclarationNode(AST_NODE* declarationNode);
 void genDeclareIdList(AST_NODE* typeNode, SymbolAttributeKind isVariableOrTypeAttribute, int ignoreArrayFirstDimSize);
-void genDeclareFunction(AST_NODE* returnTypeNode);
+void genGlobalDeclareIdList(AST_NODE* declarationNode);
+void genDeclareFunction(AST_NODE* declarationNode);
 void genDeclDimList(AST_NODE* variableDeclDimList, TypeDescriptor* typeDescriptor, int ignoreFirstDimSize);
 void genTypeNode(AST_NODE* typeNode);
 void genBlockNode(AST_NODE* blockNode);
@@ -62,13 +64,28 @@ typedef struct{
 }reg;
 
 extern SymbolTable symbolTable;
-int g_cnt = 0;
+int g_cnt = 5;
 FILE* output;
 reg regs[65];
-int nreg=0;
+int nreg=0,offset,arsize,arpos,isprint=1;
+unsigned long long mask;
+#define fprintf if(isprint) fprintf
 
 void gen_head(char *name) {
-    printf(".text\n%s:\n",name);
+    fprintf(output,"\t.text\n\t.align 1\n\t.globl %s\n\t.type %s, @function\n%s:\n",name,name,name);
+    flush_regs();
+}
+
+void gen_prologue(char *name){
+    fprintf(output,"\tsd ra,-8(sp)\n\tsd fp,-16(sp)\n\taddi fp,sp,-16\n\taddi sp,sp,-16\n");
+}
+
+void gen_epilogue(char *name){
+    fseek(output,arpos,SEEK_SET);
+    while(arsize&15) arsize++;
+    fprintf(output,"\tsub sp,sp,%d",arsize);
+    fseek(output,0,SEEK_END);
+    fprintf(output,"\tld ra,8(fp)\n\taddi sp,fp,8\n\tld fp,0(fp)\n\tjr ra\n\t.size %s, .-%1$s\n", name);
 }
 
 const char* reg_names[]={"Zero","ra","sp","gp","tp","t0","t1","t2","fp","s1","a0","a1","a2","a3","a4","a5","a6","a7","s2","s3","s4","s5","s6","s7","s8","s9","s10","s11","t3","t4","t5","t6",
@@ -98,15 +115,28 @@ void initregs(){
 }
 
 void clean_reg(int i){
-    if(regs[i].entry&&regs[i].dirty)
-        fprintf(output,"\tsw %s,-%d(fp)\n",get_reg_name(regs[i].id),regs[i].entry->offset);
+    if(regs[i].entry&&regs[i].dirty){
+        if(regs[i].entry->offset) fprintf(output,"\tsw %s,-%d(fp)\n",get_reg_name(regs[i].id),regs[i].entry->offset);
+        else{
+            char *regname=get_reg_name(regs[i].id),*idname=regs[i].entry->name;
+            fprintf(output,"\tlui %s,%%hi(%s)\n",regname,idname);
+            if(getTypeOfSymbolTableEntry(regs[i].entry)==INT_TYPE) fprintf(output,"\tsw %s,%%lo(%s)(%1$s)\n",regname,idname);
+            else fprintf(output,"\tfsw %s,%%lo(%s)(%1$s)\n",regname,idname);
+        }
+    }
     if(regs[i].entry) regs[i].entry->bindreg=-1;
     clear_reg(i);
 }
 
 void bind_reg(int i,SymbolTableEntry *entry){
     regs[i].entry=entry; entry->bindreg=i;
-    fprintf(output,"\tlw %s,-%d(fp)\n",get_reg_name(regs[i].id),entry->offset);
+    if(entry->offset) fprintf(output,"\tlw %s,-%d(fp)\n",get_reg_name(regs[i].id),entry->offset);
+    else{
+        char *regname=get_reg_name(regs[i].id),*idname=entry->name;
+        fprintf(output,"\tlui %s,%%hi(%s)\n",regname,idname);
+        if(getTypeOfSymbolTableEntry(entry)==INT_TYPE) fprintf(output,"\tlw %s,%%lo(%s)(%1$s)\n",regname,idname);
+        else fprintf(output,"\tflw %s,%%lo(%s)(%1$s)\n",regname,idname);
+    }
 }
 
 #define filter(cond) for(int i=0;i<nreg;i++){\
@@ -128,7 +158,7 @@ int get_reg(SymbolTableEntry *entry,reg_var var){
         assert(0);
     }
     else{
-        if(entry->bindreg) return entry->bindreg;
+        if(entry->bindreg >= 0) return entry->bindreg;
         filter(regs[i].var==var&&regs[i].type==TYPE_CALLEE&&regs[i].status==STATUS_DONE&&!regs[i].entry);
         filter(regs[i].var==var&&regs[i].type==TYPE_CALLEE&&regs[i].status==STATUS_UNUSE);
         filter(regs[i].var==var&&regs[i].type==TYPE_CALLEE&&regs[i].status==STATUS_DONE);
@@ -144,7 +174,7 @@ void flush_regs(){
     for(int i=0;i<nreg;i++) clean_reg(i);
 }
 
-void* save_caller_regs(int *offset){
+void* save_caller_regs(){
     for(int i=0;i<nreg;i++){
         if(regs[i].type==TYPE_CALLER&&regs[i].status==STATUS_DONE) clean_reg(i);
     }
@@ -153,8 +183,8 @@ void* save_caller_regs(int *offset){
     for(int i=0;i<nreg;i++){
         if(regs[i].type==TYPE_CALLER&&regs[i].status==STATUS_USING){
             if(!regs[i].entry){
-                fprintf(output,"\tsw %s,-%d(fp)\n",get_reg_name(regs[i].id),*offset);
-                *offset+=4;
+                offset+=4; if(offset>arsize) arsize=offset;
+                fprintf(output,"\tsw %s,-%d(fp)\n",get_reg_name(regs[i].id),offset);
             }
             clean_reg(i);
         }
@@ -162,7 +192,7 @@ void* save_caller_regs(int *offset){
     return ret;
 }
 
-void restore_caller_regs(void* saved,int *offset){
+void restore_caller_regs(void* saved){
     memcpy(regs,saved,sizeof(reg)*nreg);
     free(saved);
     for(int i=nreg-1;i>=0;i--){
@@ -170,33 +200,33 @@ void restore_caller_regs(void* saved,int *offset){
             if(regs[i].entry)
                 bind_reg(i,regs[i].entry);
             else{
-                *offset-=4;
-                fprintf(output,"\tlw %s,-%d(fp)\n",get_reg_name(regs[i].id),*offset);
+                fprintf(output,"\tlw %s,-%d(fp)\n",get_reg_name(regs[i].id),offset);
+                offset-=4;
             }
         }
     }
 }
 
-void* save_callee_regs(int *offset,unsigned mask){
+void* save_callee_regs(){
     void* ret=malloc(sizeof(reg)*nreg);
     memcpy(ret,regs,sizeof(reg)*nreg);
     for(int i=0;i<nreg;i++){
         if((mask&(1u<<i))&&regs[i].type==TYPE_CALLEE&&regs[i].status!=STATUS_UNUSE){
-            fprintf(output,"\tsw %s,-%d(fp)\n",get_reg_name(regs[i].id),*offset);
-            *offset+=4;
+            offset+=4; if(offset>arsize) arsize=offset;
+            fprintf(output,"\tsw %s,-%d(fp)\n",get_reg_name(regs[i].id),offset);
             clear_reg(i);
         }
     }
     return ret;
 }
 
-void restore_callee_regs(void* saved,int *offset,int mask){
+void restore_callee_regs(void* saved){
     memcpy(regs,saved,sizeof(reg)*nreg);
     free(saved);
     for(int i=nreg-1;i>=0;i--){
         if((mask&(1u<<i))&&regs[i].type==TYPE_CALLEE&&regs[i].status!=STATUS_UNUSE){
-            *offset-=4;
-            fprintf(output,"\tlw %s,-%d(fp)\n",get_reg_name(regs[i].id),*offset);
+            fprintf(output,"\tlw %s,-%d(fp)\n",get_reg_name(regs[i].id),offset);
+            offset-=4;
         }
     }
 }
@@ -233,11 +263,135 @@ void genDeclarationNode(AST_NODE* declarationNode) {
             assert(0);
     }
 }
-void genDeclareIdList(AST_NODE* typeNode, SymbolAttributeKind isVariableOrTypeAttribute, int ignoreArrayFirstDimSize) {
-	
+void genDeclareIdList(AST_NODE* declarationNode, SymbolAttributeKind isVariableOrTypeAttribute, int ignoreArrayFirstDimSize) {
+	AST_NODE* typeNode = declarationNode->child;
+    TypeDescriptor *tpdes = typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
+
+    AST_NODE* ptr = typeNode->rightSibling;
+    while(ptr) {
+        char* name = ptr->semantic_value.identifierSemanticValue.identifierName;
+        ptr->semantic_value.identifierSemanticValue.symbolTableEntry->offset=offset+=4;
+
+        if(offset > arsize) arsize = offset;
+        switch(ptr->semantic_value.identifierSemanticValue.kind) {
+            case NORMAL_ID:
+                break;
+            case WITH_INIT_ID:
+                // float and int are handled together
+                genExprRelatedNode(ptr->child);
+                int reg_val = ptr->child->regnumber;
+                fprintf(output, "\tsw %s, %d(fp)\n", get_reg_name(regs[reg_val].id), -offset);
+                break;
+            case ARRAY_ID:
+                /* TODO PASS 
+                attr->attr.typeDescriptor=(TypeDescriptor*)malloc(sizeof(TypeDescriptor));
+                genDeclDimList(ptr,attr->attr.typeDescriptor,ignoreArrayFirstDimSize);
+                TypeDescriptor *tmp=tpdes;
+                if(tmp->kind==SCALAR_TYPE_DESCRIPTOR)
+                    attr->attr.typeDescriptor->properties.arrayProperties.elementType=tmp->properties.dataType;
+                else if(tmp->kind==ARRAY_TYPE_DESCRIPTOR){
+                    int tpdim=tmp->properties.arrayProperties.dimension;
+                    int iddim=attr->attr.typeDescriptor->properties.arrayProperties.dimension;
+                
+                    attr->attr.typeDescriptor->properties.arrayProperties.elementType=tmp->properties.arrayProperties.elementType;
+                    attr->attr.typeDescriptor->properties.arrayProperties.dimension=tpdim+iddim;
+                    memcpy(attr->attr.typeDescriptor->properties.arrayProperties.sizeInEachDimension+iddim,tmp->properties.arrayProperties.sizeInEachDimension,tpdim*sizeof(int));
+                }     
+                */               
+                break;
+            default:
+                assert(0);
+        }
+        ptr = ptr->rightSibling;
+    }
 }
-void genDeclareFunction(AST_NODE* returnTypeNode) {
-	
+void genGlobalDeclareIdList(AST_NODE* declarationNode)  {
+    AST_NODE* typeNode = declarationNode->child;
+    TypeDescriptor *tpdes = typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
+
+    AST_NODE* ptr = typeNode->rightSibling;
+    while(ptr) {
+        char* name = ptr->semantic_value.identifierSemanticValue.identifierName;
+        fprintf(output, "\t.globl  %s\n", name);
+        ptr->semantic_value.identifierSemanticValue.symbolTableEntry->offset=0;
+        
+        int val;
+        float f;
+        switch(ptr->semantic_value.identifierSemanticValue.kind){
+            case NORMAL_ID:
+                fprintf(output, "\t.section  .sbss\n\t.align  2\n");
+                fprintf(output, "\t.type %s, @object\n", name);
+                fprintf(output, "\t.size %s, 4\n", name);
+                fprintf(output, "%s:\n", name);
+                fprintf(output, "\t.zero 4\n");
+                break;
+            case WITH_INIT_ID:
+                f = ptr->child->semantic_value.const1->const_u.fval;
+                val = (typeNode->dataType == INT_TYPE ? ptr->child->semantic_value.const1->const_u.intval : *(unsigned*)&f);
+                fprintf(output, "\t.section  .sdata\n\t.align  2\n");
+                fprintf(output, "\t.type %s, @object\n", name);
+                fprintf(output, "\t.size %s, 4\n", name);
+                fprintf(output, "%s:\n", name);
+                fprintf(output, "\t.word %d\n", val);
+                //processExprRelatedNode(ptr->child);
+                break;
+            case ARRAY_ID:
+                /* TODO PASS 
+                attr->attr.typeDescriptor=(TypeDescriptor*)malloc(sizeof(TypeDescriptor));
+                genDeclDimList(ptr,attr->attr.typeDescriptor,ignoreArrayFirstDimSize);
+                TypeDescriptor *tmp=tpdes;
+                if(tmp->kind==SCALAR_TYPE_DESCRIPTOR)
+                    attr->attr.typeDescriptor->properties.arrayProperties.elementType=tmp->properties.dataType;
+                else if(tmp->kind==ARRAY_TYPE_DESCRIPTOR){
+                    int tpdim=tmp->properties.arrayProperties.dimension;
+                    int iddim=attr->attr.typeDescriptor->properties.arrayProperties.dimension;
+                
+                    attr->attr.typeDescriptor->properties.arrayProperties.elementType=tmp->properties.arrayProperties.elementType;
+                    attr->attr.typeDescriptor->properties.arrayProperties.dimension=tpdim+iddim;
+                    memcpy(attr->attr.typeDescriptor->properties.arrayProperties.sizeInEachDimension+iddim,tmp->properties.arrayProperties.sizeInEachDimension,tpdim*sizeof(int));
+                }     
+                m(_ _)m
+                <(_ _)>
+                m(_ _)m
+                <(_ _)>
+                M(_ _)M
+                <(_ _)>
+                m(_ _)m
+                <(_ _)>
+                M(_ _)M
+                <(_ _)>
+                m(_ _)m
+                M(_ _)M
+                <(_ _)>
+                m(_ _)m
+                M(_ _)M
+                */               
+                break;
+            default:
+                assert(0);
+        }
+        ptr = ptr->rightSibling;
+    }
+}
+void genDeclareFunction(AST_NODE* declarationNode) {
+	AST_NODE *ret = declarationNode->child, *name = ret->rightSibling, *paramList=name->rightSibling, *ptr=paramList->child;
+    gen_head(name->semantic_value.identifierSemanticValue.identifierName);
+    gen_prologue(name->semantic_value.identifierSemanticValue.identifierName);
+    openScope();
+    flush_regs();
+    while(ptr) {
+        genDeclarationNode(ptr);
+        ptr=ptr->rightSibling;
+    }
+
+    AST_NODE *block = paramList->rightSibling; ptr = block->child;
+    while(ptr) {
+        genGeneralNode(ptr);
+        ptr = ptr->rightSibling;
+    }
+    closeScope();
+    flush_regs();
+    gen_epilogue(name->semantic_value.identifierSemanticValue.identifierName);
 }
 void genDeclDimList(AST_NODE* variableDeclDimList, TypeDescriptor* typeDescriptor, int ignoreFirstDimSize) {
 	
@@ -247,14 +401,12 @@ void genTypeNode(AST_NODE* typeNode) {
 }
 void genBlockNode(AST_NODE* blockNode) {
     openScope();
-    flush_regs();
     AST_NODE* ptr = blockNode->child;
     while(ptr) {
         genGeneralNode(ptr);
         ptr = ptr->rightSibling;
     }
     closeScope();
-    flush_regs();
 }
 void genStmtNode(AST_NODE* stmtNode) {
     if(stmtNode->nodeType == BLOCK_NODE) genBlockNode(stmtNode);
@@ -291,7 +443,7 @@ void genGeneralNode(AST_NODE *node) {
     node->nodeType == NONEMPTY_RELOP_EXPR_LIST_NODE) {
         AST_NODE* ptr = node->child;
         while(ptr) {
-            if(node->nodeType == VARIABLE_DECL_LIST_NODE) genDeclarationNode(ptr);
+            if(node->nodeType == VARIABLE_DECL_LIST_NODE) (symbolTable.currentLevel?genDeclarationNode(ptr): genGlobalDeclareIdList(ptr));
             else if(node->nodeType == STMT_LIST_NODE) genStmtNode(ptr);
             else if(node->nodeType == NONEMPTY_ASSIGN_EXPR_LIST_NODE) genAssignOrExpr(ptr);
             else if(node->nodeType == NONEMPTY_RELOP_EXPR_LIST_NODE) genExprRelatedNode(ptr);
@@ -324,11 +476,15 @@ void genWhileStmt(AST_NODE* whileNode) {
     int cnt = g_cnt++;
 	AST_NODE *condition = whileNode->child, *stmt = condition->rightSibling;
     fprintf(output, "_WHILE_%d:\n", cnt); 
+    flush_regs();
     genAssignOrExpr(condition);
+    flush_regs();
     fprintf(output, "\tbeqz %s, _EXIT_%d\n", get_reg_name(regs[condition->regnumber].id), cnt);
     genStmtNode(stmt);
+    flush_regs();
     fprintf(output, "\tj _WHILE_%d\n", cnt);
     fprintf(output, "_EXIT_%d:\n", cnt);
+    flush_regs();
 }
 void genForStmt(AST_NODE* forNode) {
     // TODO: convert float to int
@@ -347,12 +503,16 @@ void genForStmt(AST_NODE* forNode) {
         *loop = condition->rightSibling, *stmt = loop->rightSibling;
     genGeneralNode(assign);
     fprintf(output, "_FOR_%d:\n", cnt);
+    flush_regs();
     genGeneralNode(condition);
+    flush_regs();
     fprintf(output, "\tbeqz %s, _EXIT_%d\n", get_reg_name(regs[condition->regnumber].id), cnt);
     genStmtNode(stmt); 
-    genStmtNode(loop);
+    genGeneralNode(loop);
+    flush_regs();
     fprintf(output, "\tj _FOR_%d\n", cnt);
     fprintf(output, "_EXIT_%d:\n", cnt);
+    flush_regs();
 }
 void genAssignmentStmt(AST_NODE* assignmentNode) {
     AST_NODE *var_ref = assignmentNode->child, *relop_expr = var_ref->rightSibling;
@@ -377,13 +537,18 @@ void genIfStmt(AST_NODE* ifNode) {
     int cnt = g_cnt++;
 	AST_NODE *condition = ifNode->child, *if_stmt = condition->rightSibling, *else_stmt = if_stmt->rightSibling;
     fprintf(output, "_IF_%d:\n", cnt);
+    flush_regs();
     genAssignOrExpr(condition);
+    flush_regs();
     fprintf(output, "\tbeqz %s, _ELSE_%d\n", get_reg_name(regs[condition->regnumber].id), cnt);
     genStmtNode(if_stmt);
+    flush_regs();
     fprintf(output, "\tj _EXIT_%d\n", cnt);
     fprintf(output, "_ELSE_%d:\n", cnt);
+    flush_regs();
     genStmtNode(else_stmt);
-    fprintf(output, "_EXIT_%d\n", cnt);
+    fprintf(output, "_EXIT_%d:\n", cnt);
+    flush_regs();
 }
 
 void genWriteFunction(AST_NODE* functionCallNode) {
@@ -456,6 +621,7 @@ void genExprNode(AST_NODE* exprNode) {
 
         regs[reg1].status=STATUS_DONE; regs[reg2].status=STATUS_DONE;
         int reg0 = get_reg(NULL, type);
+        exprNode->regnumber = reg0;
 
         if(type == VAR_INT) {
             switch(exprNode->semantic_value.exprSemanticValue.op.binaryOp) {
@@ -491,7 +657,7 @@ void genExprNode(AST_NODE* exprNode) {
                     break;
                 case BINARY_OP_LT:
                     fprintf(output, "\tsub %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
-                    fprintf(output, "\tsgtz %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg0].id));
+                    fprintf(output, "\tsltz %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg0].id));
                     break;
                 case BINARY_OP_NE:
                     fprintf(output, "\tsub %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
@@ -539,23 +705,24 @@ void genVariableLValue(AST_NODE* idNode) {
 	genVariableRValue(idNode);
 }
 void genVariableRValue(AST_NODE* idNode) {
-	SymbolTableEntry *entry=retrieveSymbol(idNode->semantic_value.identifierSemanticValue.identifierName);
-    idNode->semantic_value.identifierSemanticValue.symbolTableEntry=entry;
+	SymbolTableEntry *entry=idNode->semantic_value.identifierSemanticValue.symbolTableEntry;
     TypeDescriptor* tpdes=idNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
     if(idNode->semantic_value.identifierSemanticValue.kind==ARRAY_ID||tpdes->kind==ARRAY_TYPE_DESCRIPTOR){
         /* giver TODO */
         assert(0);
     }
     else{
-        int creg=get_reg(entry,tpdes->properties.dataType==INT_TYPE?VAR_INT:VAR_FLOAT);
-        idNode->regnumber=creg;
+        DATA_TYPE tp=tpdes->properties.dataType;
+        idNode->regnumber=get_reg(entry,tp==INT_TYPE?VAR_INT:VAR_FLOAT);
     }
 }
 
 void codegen(AST_NODE *root) {
     initregs();
     output = fopen("output.s", "w");
+    fprintf(output,"\t.option nopic\n\t.text\n\t.section .sdata,\"aw\"\n\t.section .sbss,\"aw\",@nobits\n");
     genProgramNode(root);
+    fprintf(output,"\t.indent \"GCC: (GNU) 10.2.0\"\n\t.section .note.GNU-stack,\"\",@progbits\n");
     fclose(output);
 }
 

@@ -100,7 +100,8 @@ SymbolTableEntry* enterSymbol(char* symbolName, SymbolAttribute* attribute) {
     SymbolTableEntry* now = newSymbolTableEntry(symbolTable.currentLevel);
     now->attribute = attribute;
     now->name = symbolName;
-    
+    now->bindreg=-1;
+    now->offset=0;
     while(ptr) {
         if(strcmp(ptr->name, symbolName) == 0) {
             if(ptr->nestingLevel == symbolTable.currentLevel) {
