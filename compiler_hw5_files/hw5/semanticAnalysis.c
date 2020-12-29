@@ -609,22 +609,42 @@ int evaluateExprValue(AST_NODE* exprNode) {
         if(lc->dataType == INT_TYPE && rc->dataType == INT_TYPE) {
             exprNode->dataType = INT_TYPE;
             int lv, rv; getExprOrConstValue(lc, &lv, NULL); getExprOrConstValue(rc, &rv, NULL);
-            if(exprNode->semantic_value.exprSemanticValue.op.binaryOp==BINARY_OP_DIV&&rv==0){
-                printWarningMsg(exprNode,DIVIDE_BY_ZERO);
-                return 0;
+            if(exprNode->semantic_value.exprSemanticValue.op.binaryOp==BINARY_OP_DIV){
+                if(rv == 0) {
+                    printWarningMsg(exprNode,DIVIDE_BY_ZERO);
+                    return 0;
+                }
+                else {
+                    exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue=lv/rv;                
+                    return 1;
+                }
             }
-            int vals[]={lv+rv,lv-rv,lv*rv,lv/rv,lv==rv,lv>=rv,lv<=rv,lv!=rv,lv>rv,lv<rv,lv&&rv,lv||rv};
+            int vals[]={lv+rv,lv-rv,lv*rv,0,lv==rv,lv>=rv,lv<=rv,lv!=rv,lv>rv,lv<rv,lv&&rv,lv||rv};
             exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue=vals[exprNode->semantic_value.exprSemanticValue.op.binaryOp];
         }
         else {
             exprNode->dataType = FLOAT_TYPE;
             float lv, rv; getExprOrConstValue(lc, NULL, &lv); getExprOrConstValue(rc, NULL, &rv);
-            if(exprNode->semantic_value.exprSemanticValue.op.binaryOp==BINARY_OP_DIV&&rv==0){
-                printWarningMsg(exprNode,DIVIDE_BY_ZERO);
-                return 0;
+            if(exprNode->semantic_value.exprSemanticValue.op.binaryOp==BINARY_OP_DIV){
+                if(rv == 0) {
+                    printWarningMsg(exprNode,DIVIDE_BY_ZERO);
+                    return 0;
+                }
+                else {
+                    exprNode->semantic_value.exprSemanticValue.constEvalValue.fValue=lv/rv;                
+                    return 1;
+                }
             }
-            float vals[]={lv+rv,lv-rv,lv*rv,lv/rv,lv==rv,lv>=rv,lv<=rv,lv!=rv,lv>rv,lv<rv,lv&&rv,lv||rv};
-            exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue=vals[exprNode->semantic_value.exprSemanticValue.op.binaryOp];
+            
+            if(exprNode->semantic_value.exprSemanticValue.op.binaryOp >= BINARY_OP_EQ) {
+                exprNode->dataType = INT_TYPE;
+                int vals[]={0,0,0,0,lv==rv,lv>=rv,lv<=rv,lv!=rv,lv>rv,lv<rv,lv&&rv,lv||rv};
+                exprNode->semantic_value.exprSemanticValue.constEvalValue.iValue=vals[exprNode->semantic_value.exprSemanticValue.op.binaryOp];
+            }
+            else {
+                float vals[]={lv+rv,lv-rv,lv*rv,0};
+                exprNode->semantic_value.exprSemanticValue.constEvalValue.fValue=vals[exprNode->semantic_value.exprSemanticValue.op.binaryOp];
+            }
         }
     }
     else {
