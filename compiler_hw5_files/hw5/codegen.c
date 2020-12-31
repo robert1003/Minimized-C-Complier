@@ -250,7 +250,7 @@ void clear_expired_regs(){
 void gen_head(char *name) {
     fprintf(output,"\t.text\n\t.align 1\n\t.globl %s\n\t.type %s, @function\n%s:\n",name,name,name);
     if(strcmp(name, "MAIN") == 0){
-        fprintf(output,"\tfmv.w.x %s,%s\n",get_reg_name(0),get_reg_name(32));
+        fprintf(output,"\tfmv.w.x %s,%s\n",get_reg_name(32),get_reg_name(0));
     }
     flush_regs();
 }
