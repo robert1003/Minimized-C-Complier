@@ -616,9 +616,8 @@ void genGeneralNode(AST_NODE *node) {
             else if(node->nodeType == STMT_LIST_NODE) genStmtNode(ptr);
             else if(node->nodeType == NONEMPTY_ASSIGN_EXPR_LIST_NODE) genAssignOrExpr(ptr);
             else if(node->nodeType == NONEMPTY_RELOP_EXPR_LIST_NODE) genExprRelatedNode(ptr);
-            
+
             assert(ptr->dataType != ERROR_TYPE);
-            node->dataType = ptr->dataType;
             ptr = ptr->rightSibling;
         }
     }
@@ -630,8 +629,10 @@ void genAssignOrExpr(AST_NODE* assignOrExprRelatedNode) {
             genAssignmentStmt(assignOrExprRelatedNode);
         else if(assignOrExprRelatedNode->semantic_value.stmtSemanticValue.kind == FUNCTION_CALL_STMT)
             genFunctionCall(assignOrExprRelatedNode);
-        else if(assignOrExprRelatedNode->nodeType == IDENTIFIER_NODE) {
-            genVariableRValue(assignOrExprRelatedNode);
+        else { 
+            if(assignOrExprRelatedNode->nodeType == IDENTIFIER_NODE) genVariableRValue(assignOrExprRelatedNode);
+            else if(assignOrExprRelatedNode->nodeType==CONST_VALUE_NODE) genConst(assignOrExprRelatedNode);
+            else assert(0);
             int reg0 = get_reg(NULL, VAR_INT);
             if(assignOrExprRelatedNode->dataType == INT_TYPE) {
                 fprintf(output, "\tsnez %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[assignOrExprRelatedNode->regnumber].id));
