@@ -616,9 +616,8 @@ void genGeneralNode(AST_NODE *node) {
             else if(node->nodeType == STMT_LIST_NODE) genStmtNode(ptr);
             else if(node->nodeType == NONEMPTY_ASSIGN_EXPR_LIST_NODE) genAssignOrExpr(ptr);
             else if(node->nodeType == NONEMPTY_RELOP_EXPR_LIST_NODE) genExprRelatedNode(ptr);
-            
+
             assert(ptr->dataType != ERROR_TYPE);
-            node->dataType = ptr->dataType;
             ptr = ptr->rightSibling;
         }
     }
@@ -630,8 +629,10 @@ void genAssignOrExpr(AST_NODE* assignOrExprRelatedNode) {
             genAssignmentStmt(assignOrExprRelatedNode);
         else if(assignOrExprRelatedNode->semantic_value.stmtSemanticValue.kind == FUNCTION_CALL_STMT)
             genFunctionCall(assignOrExprRelatedNode);
-        else if(assignOrExprRelatedNode->nodeType == IDENTIFIER_NODE) {
-            genVariableRValue(assignOrExprRelatedNode);
+        else { 
+            if(assignOrExprRelatedNode->nodeType == IDENTIFIER_NODE) genVariableRValue(assignOrExprRelatedNode);
+            else if(assignOrExprRelatedNode->nodeType==CONST_VALUE_NODE) genConst(assignOrExprRelatedNode);
+            else assert(0);
             int reg0 = get_reg(NULL, VAR_INT);
             if(assignOrExprRelatedNode->dataType == INT_TYPE) {
                 fprintf(output, "\tsnez %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[assignOrExprRelatedNode->regnumber].id));
@@ -765,6 +766,7 @@ void genIfStmt(AST_NODE* ifNode) {
     fprintf(output, "_ELSE_%d:\n", cnt);
     flush_regs();
     genStmtNode(else_stmt);
+    flush_regs();
     fprintf(output, "_EXIT_%d:\n", cnt);
     flush_regs();
 }
@@ -906,7 +908,6 @@ void genExprNode(AST_NODE* exprNode) {
 	if(exprNode->semantic_value.exprSemanticValue.kind == BINARY_OPERATION) {
         AST_NODE *lc = exprNode->child, *rc = lc->rightSibling;
     
-        exprNode->dataType = getBiggerType(lc->dataType, rc->dataType);
         int lconst = lc->nodeType == CONST_VALUE_NODE || (lc->nodeType == EXPR_NODE && lc->semantic_value.exprSemanticValue.isConstEval);
         int rconst = rc->nodeType == CONST_VALUE_NODE || (rc->nodeType == EXPR_NODE && rc->semantic_value.exprSemanticValue.isConstEval);
 
@@ -1025,8 +1026,8 @@ void genExprNode(AST_NODE* exprNode) {
                     reg22 = get_reg(NULL, VAR_INT);
                     fprintf(output, "\tfeq.s %s, %s, %s\n", get_reg_name(regs[reg11].id), get_reg_name(regs[reg1].id), get_reg_name(32));
                     fprintf(output, "\tfeq.s %s, %s, %s\n", get_reg_name(regs[reg22].id), get_reg_name(regs[reg2].id), get_reg_name(32));
-                    fprintf(output, "\tbnez %s, _AND_false_%d\n", get_reg_name(regs[reg1].id), g_cnt);
-                    fprintf(output, "\tbnez %s, _AND_false_%d\n", get_reg_name(regs[reg2].id), g_cnt);
+                    fprintf(output, "\tbnez %s, _AND_false_%d\n", get_reg_name(regs[reg11].id), g_cnt);
+                    fprintf(output, "\tbnez %s, _AND_false_%d\n", get_reg_name(regs[reg22].id), g_cnt);
                     fprintf(output, "_AND_true_%d:\n", g_cnt);
                     fprintf(output, "\tli %s, 1\n", get_reg_name(regs[reg0].id));
                     fprintf(output, "j _AND_end_%d\n", g_cnt);
