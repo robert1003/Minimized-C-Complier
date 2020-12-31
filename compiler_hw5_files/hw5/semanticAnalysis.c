@@ -453,6 +453,7 @@ void checkAssignOrExpr(AST_NODE* assignOrExprRelatedNode) {
     else {
         if(assignOrExprRelatedNode->semantic_value.stmtSemanticValue.kind == ASSIGN_STMT) checkAssignmentStmt(assignOrExprRelatedNode);
         else if(assignOrExprRelatedNode->semantic_value.stmtSemanticValue.kind == FUNCTION_CALL_STMT) checkFunctionCall(assignOrExprRelatedNode);
+        else if(assignOrExprRelatedNode->nodeType == IDENTIFIER_NODE) processVariableRValue(assignOrExprRelatedNode);
     }
 }
 
