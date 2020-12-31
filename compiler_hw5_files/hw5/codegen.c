@@ -76,7 +76,7 @@ typedef union{
     };
     struct{
         unsigned :12,hi:20;
-    }
+    };
 }Int;
 
 int get_reg(SymbolTableEntry *entry,reg_var var);
@@ -166,7 +166,6 @@ void flush_regs(){
 }
 
 void gen_head(char *name) {
-    if(strcmp(name,"main")==0) name="_start_MAIN";
     fprintf(output,"\t.text\n\t.align 1\n\t.globl %s\n\t.type %s, @function\n%s:\n",name,name,name);
     flush_regs();
 }
@@ -349,23 +348,20 @@ void genDeclarationNode(AST_NODE* declarationNode) {
 void genDeclareIdList(AST_NODE* declarationNode) {
 	AST_NODE* typeNode = declarationNode->child;
     TypeDescriptor *tpdes = typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
-
     AST_NODE* ptr = typeNode->rightSibling;
     while(ptr) {
         char* name = ptr->semantic_value.identifierSemanticValue.identifierName;
-        ptr->semantic_value.identifierSemanticValue.symbolTableEntry->offset=offset+=4;
 
-        if(offset > arsize) arsize+=4;
-        switch(ptr->semantic_value.identifierSemanticValue.kind) {
-            case NORMAL_ID:
-                break;
-            case WITH_INIT_ID:
-                // float and int are handled together
-                genExprRelatedNode(ptr->child);
-                int reg_val = ptr->child->regnumber; regs[reg_val].status=STATUS_DONE;
-                store_reg(reg_val, offset);
-                break;
-            case ARRAY_ID:
+        if(ptr->semantic_value.identifierSemanticValue.kind==WITH_INIT_ID) {
+            // float and int are handled together
+            ptr->semantic_value.identifierSemanticValue.symbolTableEntry->offset=offset+=4;
+            genExprRelatedNode(ptr->child);
+            int reg_val = ptr->child->regnumber; regs[reg_val].status=STATUS_DONE;
+            store_reg(reg_val, offset);
+        }
+        else{
+            genDeclDimList(ptr,attr->attr.typeDescriptor,ignoreArrayFirstDimSize);   
+        }
                 /* TODO PASS 
                 attr->attr.typeDescriptor=(TypeDescriptor*)malloc(sizeof(TypeDescriptor));
                 genDeclDimList(ptr,attr->attr.typeDescriptor,ignoreArrayFirstDimSize);
@@ -380,11 +376,9 @@ void genDeclareIdList(AST_NODE* declarationNode) {
                     attr->attr.typeDescriptor->properties.arrayProperties.dimension=tpdim+iddim;
                     memcpy(attr->attr.typeDescriptor->properties.arrayProperties.sizeInEachDimension+iddim,tmp->properties.arrayProperties.sizeInEachDimension,tpdim*sizeof(int));
                 }     
-                */               
-                break;
-            default:
-                assert(0);
-        }
+                */          
+
+        if(offset > arsize) arsize=offset;
         ptr = ptr->rightSibling;
     }
 }
@@ -612,15 +606,25 @@ void genAssignmentStmt(AST_NODE* assignmentNode) {
     AST_NODE *var_ref = assignmentNode->child, *relop_expr = var_ref->rightSibling;
     genExprRelatedNode(relop_expr);
     genVariableLValue(var_ref);
-    int lreg = regs[var_ref->regnumber].id, rreg = regs[relop_expr->regnumber].id;
-    regs[var_ref->regnumber].dirty = 1; 
-    regs[var_ref->regnumber].status=regs[relop_expr->regnumber].status=STATUS_DONE;
+    int lreg = regs[var_ref->regnumber].id, rreg = regs[relop_expr->regnumber].id;    
     if(var_ref->dataType == INT_TYPE) {
+        if(relop_expr->dataType == FLOAT_TYPE) {
+            int ttmp = get_reg(NULL, VAR_INT); regs[ttmp].status = STATUS_DONE;
+            fprintf(output, "\tfmv.x.w %s, %s\n", get_reg_name(ttmp), get_reg_name(rreg));
+            rreg = ttmp;
+        } 
         fprintf(output, "\tmv %s, %s\n", get_reg_name(lreg), get_reg_name(rreg));
     }
     else {
+        if(relop_expr->dataType == INT_TYPE) {
+            int ttmp = get_reg(NULL, VAR_FLOAT); regs[ttmp].status = STATUS_DONE;
+            fprintf(output, "\tfmv.w.x %s, %s\n", get_reg_name(ttmp), get_reg_name(rreg));
+            rreg = ttmp;
+        } 
         fprintf(output, "\tfmv.s %s, %s\n", get_reg_name(lreg), get_reg_name(rreg));
     }
+    regs[var_ref->regnumber].dirty = 1; 
+    regs[var_ref->regnumber].status=regs[relop_expr->regnumber].status=STATUS_DONE;
 }
 void genIfStmt(AST_NODE* ifNode) {
     /*
@@ -753,6 +757,7 @@ void genReturnStmt(AST_NODE* returnNode) {
     else {
         fprintf(output, "\tfmv.s %s, %s\n", get_reg_name(10 + 32), get_reg_name(regs[reg].id));
     }
+    flush_regs();
     fprintf(output, "\tj %s_EXIT_\n", pNode->child->rightSibling->semantic_value.identifierSemanticValue.identifierName);
 }
 void genConst(AST_NODE* node) {
@@ -775,7 +780,7 @@ void genConst(AST_NODE* node) {
         fprintf(output, "\taddi %s, %s, %d\n", get_reg_name(regs[reg].id), get_reg_name(regs[reg].id), tmp.lo);
     }
     else {
-        fprintf(output, "\taddi %s, %s, %d\n", get_reg_name(regs[reg].id), get_reg_name(0), tmp.val);
+        fprintf(output, "\taddi %s, %s, %d\n", get_reg_name(regs[reg].id), get_reg_name(0), tmp.lo);
     }
 
     if(type == VAR_FLOAT) {
