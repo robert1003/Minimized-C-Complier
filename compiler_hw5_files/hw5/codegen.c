@@ -249,7 +249,7 @@ void clear_expired_regs(){
 
 void gen_head(char *name) {
     fprintf(output,"\t.text\n\t.align 1\n\t.globl %s\n\t.type %s, @function\n%s:\n",name,name,name);
-    if(name=="MAIN"){
+    if(strcmp(name, "MAIN") == 0){
         fprintf(output,"\tfmv.w.x %s,%s\n",get_reg_name(0),get_reg_name(32));
     }
     flush_regs();
@@ -592,12 +592,27 @@ void genGeneralNode(AST_NODE *node) {
     }
 }
 void genAssignOrExpr(AST_NODE* assignOrExprRelatedNode) {
-	if(assignOrExprRelatedNode->nodeType == EXPR_NODE) genExprNode(assignOrExprRelatedNode);
+    if(assignOrExprRelatedNode->nodeType == EXPR_NODE) genExprNode(assignOrExprRelatedNode);
     else {
         if(assignOrExprRelatedNode->semantic_value.stmtSemanticValue.kind == ASSIGN_STMT)
             genAssignmentStmt(assignOrExprRelatedNode);
         else if(assignOrExprRelatedNode->semantic_value.stmtSemanticValue.kind == FUNCTION_CALL_STMT)
             genFunctionCall(assignOrExprRelatedNode);
+        else if(assignOrExprRelatedNode->nodeType == IDENTIFIER_NODE) {
+            fprintf(stderr, "poop\n");
+            genVariableRValue(assignOrExprRelatedNode);
+            fprintf(stderr, "poop\n");
+            int reg0 = get_reg(NULL, VAR_INT);
+            if(assignOrExprRelatedNode->dataType == INT_TYPE) {
+                fprintf(output, "\tsnez %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[assignOrExprRelatedNode->regnumber].id));
+            }
+            else {
+                fprintf(output, "\tfeq.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[assignOrExprRelatedNode->regnumber].id), get_reg_name(32));
+                fprintf(output, "\tseqz %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg0].id));
+            }
+            regs[assignOrExprRelatedNode->regnumber].status = STATUS_DONE;
+            assignOrExprRelatedNode->regnumber = reg0;
+        }
     }
 }
 void genWhileStmt(AST_NODE* whileNode) {
@@ -1016,7 +1031,7 @@ void genExprNode(AST_NODE* exprNode) {
             exprNode->regnumber = reg;
         }
         else {
-            int reg0 = get_reg(NULL, type);
+            int reg0 = get_reg(NULL, (op == UNARY_OP_NEGATIVE ? type : VAR_INT));
             
             if(type == VAR_INT) {
                 if(op == UNARY_OP_NEGATIVE) {
@@ -1029,6 +1044,10 @@ void genExprNode(AST_NODE* exprNode) {
             else {
                 if(op == UNARY_OP_NEGATIVE) {
                     fprintf(output, "\tfneg.s %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg].id));
+                }
+                else {
+                    fprintf(output, "\tfeq.s %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg].id));
+                    fprintf(output, "\tseqz %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg0].id)); // UNARY_OP_LOGICAL_NEGATION
                 }
             }
 
