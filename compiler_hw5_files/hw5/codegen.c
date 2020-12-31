@@ -238,6 +238,15 @@ void flush_regs(){
     for(int i=0;i<nreg;i++) clean_reg(i);
 }
 
+void clear_expired_regs(){
+    for(int i=0;i<nreg;i++){
+        if(regs[i].status!=STATUS_UNUSE&&regs[i].entry&&regs[i].entry->offset>offset){
+            regs[i].entry->bindreg=-1;
+            clear_reg(i);
+        }
+    }
+}
+
 void gen_head(char *name) {
     fprintf(output,"\t.text\n\t.align 1\n\t.globl %s\n\t.type %s, @function\n%s:\n",name,name,name);
     flush_regs();
@@ -438,6 +447,7 @@ void genDeclareIdList(AST_NODE* declarationNode) {
             int length=entry->attribute->attr.typeDescriptor->properties.arrayProperties.sizeInEachDimension[0];
             ptr->semantic_value.identifierSemanticValue.symbolTableEntry->offset=offset+=4*length;
         }
+        else ptr->semantic_value.identifierSemanticValue.symbolTableEntry->offset=offset+=4;
         if(offset > arsize) arsize=offset;
         ptr = ptr->rightSibling;
     }
@@ -528,6 +538,7 @@ void genBlockNode(AST_NODE* blockNode) {
     }
     symbolTable.currentLevel--;
     offset = _offset;
+    clear_expired_regs();
 }
 void genStmtNode(AST_NODE* stmtNode) {
     if(stmtNode->nodeType == BLOCK_NODE) genBlockNode(stmtNode);
