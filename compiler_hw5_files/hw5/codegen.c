@@ -694,6 +694,8 @@ void genAssignmentStmt(AST_NODE* assignmentNode) {
         regs[var_ref->regnumber].dirty = 1; 
         regs[var_ref->regnumber].status=regs[relop_expr->regnumber].status=STATUS_DONE;
     }
+    regs[var_ref->regnumber].dirty = 1;
+    regs[var_ref->regnumber].status=regs[relop_expr->regnumber].status=STATUS_DONE;
 }
 void genIfStmt(AST_NODE* ifNode) {
     /*
@@ -897,7 +899,7 @@ void genExprNode(AST_NODE* exprNode) {
                 case BINARY_OP_GE:
                     fprintf(output, "\tsub %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
                     fprintf(output, "\tsltz %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg0].id));
-                    fprintf(output, "\tnot %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg0].id));
+                    fprintf(output, "\tseqz %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg0].id));
                     break;
                 case BINARY_OP_GT:
                     fprintf(output, "\tsub %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
@@ -906,7 +908,7 @@ void genExprNode(AST_NODE* exprNode) {
                 case BINARY_OP_LE:
                     fprintf(output, "\tsub %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
                     fprintf(output, "\tsgtz %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg0].id));
-                    fprintf(output, "\tnot %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg0].id));
+                    fprintf(output, "\tseqz %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg0].id));
                     break;
                 case BINARY_OP_LT:
                     fprintf(output, "\tsub %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
@@ -916,12 +918,25 @@ void genExprNode(AST_NODE* exprNode) {
                     fprintf(output, "\tsub %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
                     fprintf(output, "\tsnez %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg0].id));
                     break;
-                // DOTO XXX giver will fix it to logical or
                 case BINARY_OP_OR:
-                    fprintf(output, "\tor %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
+                    fprintf(output, "\tbnez %s, _OR_true_%d\n", get_reg_name(regs[reg1].id), g_cnt);
+                    fprintf(output, "\tbeqz %s, _OR_false_%d\n", get_reg_name(regs[reg2].id), g_cnt);
+                    fprintf(output, "_OR_true_%d:\n", g_cnt);
+                    fprintf(output, "\tli %s, 1\n", get_reg_name(regs[reg0].id));
+                    fprintf(output, "j _OR_end_%d\n", g_cnt);
+                    fprintf(output, "_OR_false_%d:\n", g_cnt);
+                    fprintf(output, "\tli %s, 0\n", get_reg_name(regs[reg0].id));
+                    fprintf(output, "_OR_end_%d:\n", g_cnt++);
                     break;
                 case BINARY_OP_AND:
-                    fprintf(output, "\tand %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
+                    fprintf(output, "\tbeqz %s, _AND_false_%d\n", get_reg_name(regs[reg1].id), g_cnt);
+                    fprintf(output, "\tbeqz %s, _AND_false_%d\n", get_reg_name(regs[reg2].id), g_cnt);
+                    fprintf(output, "_AND_true_%d:\n", g_cnt);
+                    fprintf(output, "\tli %s, 1\n", get_reg_name(regs[reg0].id));
+                    fprintf(output, "j _AND_end_%d\n", g_cnt);
+                    fprintf(output, "_AND_false_%d:\n", g_cnt);
+                    fprintf(output, "\tli %s, 0\n", get_reg_name(regs[reg0].id));
+                    fprintf(output, "_AND_end_%d:\n", g_cnt++);
                     break;
                 default:
                     assert(0);
@@ -948,12 +963,12 @@ void genExprNode(AST_NODE* exprNode) {
                     break;
                 // DOTO XXX giver will fix it
                 case BINARY_OP_OR:
-                    exprNode->regnumber = reg0 = get_reg(NULL, VAR_FLOAT);
-                    fprintf(output, "\tor %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
+                    exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
+                    assert(0);
                     break;
                 case BINARY_OP_AND:
-                    exprNode->regnumber = reg0 = get_reg(NULL, VAR_FLOAT);
-                    fprintf(output, "\tand %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
+                    exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
+                    assert(0);
                     break;                    
                 case BINARY_OP_EQ:
                     exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
