@@ -1,0 +1,41 @@
+gcc -g -c codegen.c
+gcc -g -c parser.tab.c
+gcc -g -o parser parser.tab.o alloc.o functions.o symbolTable.o semanticAnalysis.o codegen.o -lfl 
+Parsing completed. No errors found.
+1 1
+2 1
+3 2
+4 1
+5 2
+6 2
+7 3
+8 1
+9 2
+10 2
+11 3
+22 3
+45 4
+90 4
+181 5
+362 5
+725 6
+1450 6
+2901 7
+5802 7
+11605 8
+23210 8
+46421 9
+92842 9
+185685 10
+371370 10
+742741 11
+1485482 11
+2970965 12
+5941930 12
+11883861 13
+23767722 13
+47535445 14
+95070890 14
+190141781 15
+380283562 15
+760567125 16
