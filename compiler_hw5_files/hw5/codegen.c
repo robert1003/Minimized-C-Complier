@@ -707,12 +707,12 @@ void genAssignmentStmt(AST_NODE* assignmentNode) {
         int ireg=var_ref->child->regnumber,rreg=relop_expr->regnumber;
         if(var_ref->dataType == INT_TYPE&&relop_expr->dataType==FLOAT_TYPE) {
             int ttmp = get_reg(NULL, VAR_INT); regs[rreg].status = STATUS_DONE;
-            fprintf(output, "\tfmv.x.w %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
+            fprintf(output, "\tfcvt.s.w %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
             rreg = ttmp;
         }
         else if(var_ref->dataType==FLOAT_TYPE&&relop_expr->dataType==INT_TYPE){
             int ttmp = get_reg(NULL, VAR_FLOAT); regs[rreg].status = STATUS_DONE;
-            fprintf(output, "\tfmv.w.x %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
+            fprintf(output, "\tfcvt.s.x %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
             rreg = ttmp;
         }
         if(entry->offset) store_reg(rreg,entry->offset,ireg);
@@ -724,7 +724,7 @@ void genAssignmentStmt(AST_NODE* assignmentNode) {
         if(var_ref->dataType == INT_TYPE) {
             if(relop_expr->dataType == FLOAT_TYPE) {
                 int ttmp = get_reg(NULL, VAR_INT); regs[rreg].status = STATUS_DONE;
-                fprintf(output, "\tfmv.x.w %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
+                fprintf(output, "\tfcvt.s.w %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
                 rreg = ttmp;
             }
             fprintf(output, "\tmv %s, %s\n", get_reg_name(regs[lreg].id), get_reg_name(regs[rreg].id));
@@ -732,7 +732,7 @@ void genAssignmentStmt(AST_NODE* assignmentNode) {
         else {
             if(relop_expr->dataType == INT_TYPE) {
                 int ttmp = get_reg(NULL, VAR_FLOAT); regs[rreg].status = STATUS_DONE;
-                fprintf(output, "\tfmv.w.x %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
+                fprintf(output, "\tfcvt.s.x %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
                 rreg = ttmp;
             }
             fprintf(output, "\tfmv.s %s, %s\n", get_reg_name(regs[lreg].id), get_reg_name(regs[rreg].id));
@@ -784,7 +784,6 @@ void genWriteFunction(AST_NODE* functionCallNode) {
     }
     else if(param->dataType==FLOAT_TYPE){
         int reg=param->regnumber;
-        fprintf(stderr,"\t1fmv.s fa0,%s\n",get_reg_name(regs[reg].id)); regs[reg].status=STATUS_DONE;
         fprintf(output,"\tfmv.s fa0,%s\n",get_reg_name(regs[reg].id)); regs[reg].status=STATUS_DONE;
         save_caller_regs();
         fprintf(output,"\tjal _write_float\n");
@@ -831,7 +830,6 @@ void genFunctionCall(AST_NODE* functionCallNode) {
             fprintf(output, "\tmv %s, %s\n", get_reg_name(regs[reg].id), get_reg_name(10));
         }
         else {
-            fprintf(stderr, "\t2fmv.s %s, %s\n", get_reg_name(regs[reg].id), get_reg_name(10 + 32));
             fprintf(output, "\tfmv.s %s, %s\n", get_reg_name(regs[reg].id), get_reg_name(10 + 32));
         }
         functionCallNode->regnumber = reg;
@@ -873,7 +871,6 @@ void genReturnStmt(AST_NODE* returnNode) {
         fprintf(output, "\tmv %s, %s\n", get_reg_name(10), get_reg_name(regs[reg].id));
     }
     else if(returnNode->child->dataType == FLOAT_TYPE) {
-        fprintf(stderr, "\t3fmv.s %s, %s\n", get_reg_name(10 + 32), get_reg_name(regs[reg].id));
         fprintf(output, "\tfmv.s %s, %s\n", get_reg_name(10 + 32), get_reg_name(regs[reg].id));
     }
     flush_regs();
@@ -897,7 +894,6 @@ void genConst(AST_NODE* node) {
 
     if(type == VAR_FLOAT) {
         int regg = get_reg(NULL, VAR_FLOAT); regs[reg].status=STATUS_DONE;
-        fprintf(stderr, "\t4fmv.w.x %s, %s\n", get_reg_name(regs[regg].id), get_reg_name(regs[reg].id));
         fprintf(output, "\tfmv.w.x %s, %s\n", get_reg_name(regs[regg].id), get_reg_name(regs[reg].id));
         reg = regg;
     }
