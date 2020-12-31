@@ -282,7 +282,13 @@ void gen_head(char *name) {
 }
 
 void gen_prologue(char *name){
-    fprintf(output,"\tsd ra,-8(sp)\n\tsd fp,-16(sp)\n\taddi fp,sp,-16\n\taddi sp,sp,-16\n\taddi sp,sp,-%d\n",arsize);
+    fprintf(output,"\tsd ra,-8(sp)\n\tsd fp,-16(sp)\n\taddi fp,sp,-16\n\taddi sp,sp,-16\n");
+    if(arsize>2048){
+        int reg=get_reg(NULL,VAR_INT); Int tmp; tmp.val=arsize;
+        gen_loadimm(reg,tmp); regs[reg].status=STATUS_DONE;
+        fprintf(output,"\tsub sp,sp,%s\n",get_reg_name(regs[reg].id));
+    }
+    else fprintf(output,"\taddi sp,sp,-%d\n",arsize);
 }
 
 void gen_epilogue(char *name){
