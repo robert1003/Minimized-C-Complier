@@ -38,7 +38,7 @@ void genVariableRValue(AST_NODE* idNode);
 void genExprOrConstValue(AST_NODE* exprOrConstNode, int* iValue, float* fValue);
 void genConst(AST_NODE* node);
 int genEvaluateExprValue(AST_NODE* exprNode);
-
+void genArraySubscript(AST_NODE* ptr);
 typedef enum{
     STATUS_UNUSE,
     STATUS_USING,
@@ -115,29 +115,111 @@ void clear_reg(int i){
     regs[i].dirty=0; regs[i].status=STATUS_UNUSE; regs[i].entry=NULL;
 }
 
-void load_reg(int i,int off){
-    if(regs[i].id<32){
-        fprintf(output,"\tlw %s,-%d(fp)\n",get_reg_name(regs[i].id),off);
+void load_reg(int i,int off,int ireg){
+    if(ireg<0){
+        if(regs[i].id<32){
+            fprintf(output,"\tlw %s,-%d(fp)\n",get_reg_name(regs[i].id),off);
+        }
+        else{
+            fprintf(output,"\tflw %s,-%d(fp)\n",get_reg_name(regs[i].id),off);
+        }
     }
     else{
-        fprintf(output,"\tflw %s,-%d(fp)\n",get_reg_name(regs[i].id),off);
+        if(regs[i].id<32){
+            fprintf(output,"\tadd %s,%s,fp\n",get_reg_name(regs[ireg].id),get_reg_name(regs[ireg].id));
+            fprintf(output,"\tlw %s,-%d(%s)\n",get_reg_name(regs[i].id),off,get_reg_name(regs[ireg].id));
+        }
+        else{
+            fprintf(output,"\tadd %s,%s,fp\n",get_reg_name(regs[ireg].id),get_reg_name(regs[ireg].id));
+            fprintf(output,"\tflw %s,-%d(%s)\n",get_reg_name(regs[i].id),off,get_reg_name(regs[ireg].id));
+        }
     }
 }
 
-void store_reg(int i,int off){
-    if(regs[i].id<32){
-        fprintf(output,"\tsw %s,-%d(fp)\n",get_reg_name(regs[i].id),off);
+void store_reg(int i,int off,int ireg){
+    if(ireg<0){
+        if(regs[i].id<32){
+            fprintf(output,"\tsw %s,-%d(fp)\n",get_reg_name(regs[i].id),off);
+        }
+        else{
+            fprintf(output,"\tfsw %s,-%d(fp)\n",get_reg_name(regs[i].id),off);
+        }
     }
     else{
-        fprintf(output,"\tfsw %s,-%d(fp)\n",get_reg_name(regs[i].id),off);
+        if(regs[i].id<32){
+            fprintf(output,"\tadd %s,%s,fp\n",get_reg_name(regs[ireg].id),get_reg_name(regs[ireg].id));
+            fprintf(output,"\tsw %s,-%d(%s)\n",get_reg_name(regs[i].id),off,get_reg_name(regs[ireg].id));
+        }
+        else{
+            fprintf(output,"\tadd %s,%s,fp\n",get_reg_name(regs[ireg].id),get_reg_name(regs[ireg].id));
+            fprintf(output,"\tfsw %s,-%d(%s)\n",get_reg_name(regs[i].id),off,get_reg_name(regs[ireg].id));
+        }
     }
+}
+
+void load_global_reg(int i,char* idname,int ireg){
+    int tmpreg=get_reg(NULL,VAR_INT); regs[tmpreg].status=STATUS_DONE;
+    if(ireg<0){
+        if(regs[i].id<32){
+            fprintf(output,"\tlui %s,%%hi(%s)\n",get_reg_name(regs[tmpreg].id),idname);
+            fprintf(output,"\tlw %s,%%lo(%s)(%s)\n",get_reg_name(regs[i].id),idname,get_reg_name(regs[tmpreg].id));
+        }
+        else{
+            fprintf(output,"\tlui %s,%%hi(%s)\n",get_reg_name(regs[tmpreg].id),idname);
+            fprintf(output,"\tflw %s,%%lo(%s)(%s)\n",get_reg_name(regs[i].id),idname,get_reg_name(regs[tmpreg].id));
+        }
+    }
+    else{
+        if(regs[i].id<32){
+            fprintf(output,"\tlui %s,%%hi(%s)\n",get_reg_name(regs[tmpreg].id),idname);
+            fprintf(output,"\taddi %s,%s,%%lo(%s)\n",get_reg_name(regs[tmpreg].id),get_reg_name(regs[tmpreg].id),idname);
+            fprintf(output,"\tadd %s,%s,%s\n",get_reg_name(regs[tmpreg].id),get_reg_name(regs[tmpreg].id),get_reg_name(regs[ireg].id));
+            fprintf(output,"\tlw %s,0(%s)\n",get_reg_name(regs[i].id),get_reg_name(regs[tmpreg].id));
+        }
+        else{
+            fprintf(output,"\tlui %s,%%hi(%s)\n",get_reg_name(regs[tmpreg].id),idname);
+            fprintf(output,"\taddi %s,%s,%%lo(%s)\n",get_reg_name(regs[tmpreg].id),get_reg_name(regs[tmpreg].id),idname);
+            fprintf(output,"\tadd %s,%s,%s\n",get_reg_name(regs[tmpreg].id),get_reg_name(regs[tmpreg].id),get_reg_name(regs[ireg].id));
+            fprintf(output,"\tflw %s,0(%s)\n",get_reg_name(regs[i].id),get_reg_name(regs[tmpreg].id));
+        }
+    }
+    clear_reg(tmpreg);
+}
+
+void store_global_reg(int i,char* idname,int ireg){
+    int tmpreg=get_reg(NULL,VAR_INT); regs[tmpreg].status=STATUS_DONE;
+    if(ireg<0){
+        if(regs[i].id<32){
+            fprintf(output,"\tlui %s,%%hi(%s)\n",get_reg_name(regs[tmpreg].id),idname);
+            fprintf(output,"\tsw %s,%%lo(%s)(%s)\n",get_reg_name(regs[i].id),idname,get_reg_name(regs[tmpreg].id));
+        }
+        else{
+            fprintf(output,"\tlui %s,%%hi(%s)\n",get_reg_name(regs[tmpreg].id),idname);
+            fprintf(output,"\tfsw %s,%%lo(%s)(%s)\n",get_reg_name(regs[i].id),idname,get_reg_name(regs[tmpreg].id));
+        }
+    }
+    else{
+        if(regs[i].id<32){
+            fprintf(output,"\tlui %s,%%hi(%s)\n",get_reg_name(regs[tmpreg].id),idname);
+            fprintf(output,"\taddi %s,%s,%%lo(%s)\n",get_reg_name(regs[tmpreg].id),get_reg_name(regs[tmpreg].id),idname);
+            fprintf(output,"\tadd %s,%s,%s\n",get_reg_name(regs[tmpreg].id),get_reg_name(regs[tmpreg].id),get_reg_name(regs[ireg].id));
+            fprintf(output,"\tsw %s,0(%s)\n",get_reg_name(regs[i].id),get_reg_name(regs[tmpreg].id));
+        }
+        else{
+            fprintf(output,"\tlui %s,%%hi(%s)\n",get_reg_name(regs[tmpreg].id),idname);
+            fprintf(output,"\taddi %s,%s,%%lo(%s)\n",get_reg_name(regs[tmpreg].id),get_reg_name(regs[tmpreg].id),idname);
+            fprintf(output,"\tadd %s,%s,%s\n",get_reg_name(regs[tmpreg].id),get_reg_name(regs[tmpreg].id),get_reg_name(regs[ireg].id));
+            fprintf(output,"\tfsw %s,0(%s)\n",get_reg_name(regs[i].id),get_reg_name(regs[tmpreg].id));
+        }
+    }
+    clear_reg(tmpreg);
 }
 
 void clean_reg(int i){
     if(regs[i].entry&&regs[i].dirty){
         if(regs[i].entry->offset){
             if(regs[i].entry->offset<=offset){
-                store_reg(i, regs[i].entry->offset);
+                store_reg(i, regs[i].entry->offset,-1);
                 /*
                 if(getTypeOfSymbolTableEntry(regs[i].entry)==INT_TYPE) fprintf(output,"\tsw %s,-%d(fp)\n",get_reg_name(regs[i].id),regs[i].entry->offset);
                 else fprintf(output,"\tfsw %s,-%d(fp)\n",get_reg_name(regs[i].id),regs[i].entry->offset);
@@ -145,16 +227,7 @@ void clean_reg(int i){
             }
         }
         else{
-            char *idname=regs[i].entry->name;
-            if(regs[i].id<32){
-                fprintf(output,"\tlui %s,%%hi(%s)\n",get_reg_name(regs[i].id),idname);
-                fprintf(output,"\tsw %s,%%lo(%s)(%1$s)\n",get_reg_name(regs[i].id),idname);
-            }
-            else{
-                int tmpreg=get_reg(NULL,VAR_INT); regs[tmpreg].status=STATUS_DONE;
-                fprintf(output,"\tlui %s,%%hi(%s)\n",get_reg_name(regs[tmpreg].id),idname);
-                fprintf(output,"\tfsw %s,%%lo(%s)(%s)\n",get_reg_name(regs[i].id),idname,get_reg_name(regs[tmpreg].id));
-            }
+            store_global_reg(i,regs[i].entry->name,-1);
         }
     }
     if(regs[i].entry) regs[i].entry->bindreg=-1;
@@ -196,19 +269,8 @@ void initregs(){
 
 void bind_reg(int i,SymbolTableEntry *entry){
     regs[i].entry=entry; entry->bindreg=i;
-    if(entry->offset) load_reg(i, entry->offset);
-    else{
-        char *idname=entry->name;
-        if(regs[i].id<32){
-            fprintf(output,"\tlui %s,%%hi(%s)\n",get_reg_name(regs[i].id),idname);
-            fprintf(output,"\tlw %s,%%lo(%s)(%1$s)\n",get_reg_name(regs[i].id),idname);
-        }
-        else{
-            int tmpreg=get_reg(NULL,VAR_INT); regs[tmpreg].status=STATUS_DONE;
-            fprintf(output,"\tlui %s,%%hi(%s)\n",get_reg_name(regs[tmpreg].id),idname);
-            fprintf(output,"\tflw %s,%%lo(%s)(%s)\n",get_reg_name(regs[i].id),idname,get_reg_name(regs[tmpreg].id));
-        }
-    }
+    if(entry->offset) load_reg(i, entry->offset,-1);
+    else load_global_reg(i,entry->name,-1);
 }
 
 #define filter(cond) for(int i=0;i<nreg;i++){\
@@ -249,30 +311,42 @@ int get_reg(SymbolTableEntry *entry,reg_var var){
 void save_caller_regs(){
     for(int i=0;i<nreg;i++){
         if(regs[i].type==TYPE_CALLER&&regs[i].status==STATUS_DONE) clean_reg(i);
-        else if(regs[i].entry&&!regs[i].entry->offset) clean_reg(i); // global variable side effect
+        else if(regs[i].entry&&!regs[i].entry->offset&&regs[i].status==STATUS_DONE) clean_reg(i); // global variable side effect
     }
     /* TODO restore using global variable */
     for(int i=0;i<nreg;i++){
-        if(regs[i].type==TYPE_CALLER&&regs[i].status==STATUS_USING){
+        if(regs[i].entry&&!regs[i].entry->offset){
+            if(regs[i].dirty){
+                store_global_reg(i,regs[i].entry->name,-1);
+                regs[i].dirty=0;
+            }
+        }
+        else if(regs[i].type==TYPE_CALLER&&regs[i].status==STATUS_USING){
             if(!regs[i].entry){
                 offset+=4; if(offset>arsize) arsize+=4;
-                store_reg(i, offset);
+                store_reg(i, offset,-1);
                 /*
                 fprintf(output,"\tsw %s,-%d(fp)\n",get_reg_name(regs[i].id),offset);
                 */
             }
-            else store_reg(i,regs[i].entry->offset);
+            else if(regs[i].dirty){
+                store_reg(i,regs[i].entry->offset,-1);
+                regs[i].dirty=0;
+            }
         }
     }
 }
 
 void restore_caller_regs(){
     for(int i=nreg-1;i>=0;i--){
+        if(regs[i].entry&&!regs[i].entry->offset){
+            load_global_reg(i,regs[i].entry->name,-1);
+        }
         if(regs[i].type==TYPE_CALLER&&regs[i].status==STATUS_USING){
             if(regs[i].entry)
-                load_reg(i,regs[i].entry->offset);
+                load_reg(i,regs[i].entry->offset,-1);
             else{
-                load_reg(i, offset);
+                load_reg(i, offset,-1);
                 /*
                 fprintf(output,"\tlw %s,-%d(fp)\n",get_reg_name(regs[i].id),offset);
                 */
@@ -293,7 +367,7 @@ void save_callee_regs(){
     for(int i=0;i<nreg;i++){
         if((mask&(1ull<<i))&&regs[i].type==TYPE_CALLEE){
             offset+=4; if(offset>arsize) arsize+=4;
-            store_reg(i,offset);
+            store_reg(i,offset,-1);
             /*
             fprintf(output,"\tsw %s,-%d(fp)\n",get_reg_name(regs[i].id),offset);
             */
@@ -305,7 +379,7 @@ void save_callee_regs(){
 void restore_callee_regs(){
     for(int i=nreg-1;i>=0;i--){
         if((mask&(1ull<<i))&&regs[i].type==TYPE_CALLEE){
-            load_reg(i, offset);
+            load_reg(i, offset,-1);
             /*
             fprintf(output,"\tlw %s,-%d(fp)\n",get_reg_name(regs[i].id),offset);
             */
@@ -351,33 +425,19 @@ void genDeclareIdList(AST_NODE* declarationNode) {
     AST_NODE* ptr = typeNode->rightSibling;
     while(ptr) {
         char* name = ptr->semantic_value.identifierSemanticValue.identifierName;
-
+        SymbolTableEntry *entry=ptr->semantic_value.identifierSemanticValue.symbolTableEntry;
         if(ptr->semantic_value.identifierSemanticValue.kind==WITH_INIT_ID) {
             // float and int are handled together
             ptr->semantic_value.identifierSemanticValue.symbolTableEntry->offset=offset+=4;
             genExprRelatedNode(ptr->child);
             int reg_val = ptr->child->regnumber; regs[reg_val].status=STATUS_DONE;
-            store_reg(reg_val, offset);
+            store_reg(reg_val, offset,-1);
         }
-        else{
-            genDeclDimList(ptr,attr->attr.typeDescriptor,ignoreArrayFirstDimSize);   
+        else if(entry->attribute->attr.typeDescriptor->kind==ARRAY_TYPE_DESCRIPTOR){
+            /* TODO multi dimension */
+            int length=entry->attribute->attr.typeDescriptor->properties.arrayProperties.sizeInEachDimension[0];
+            ptr->semantic_value.identifierSemanticValue.symbolTableEntry->offset=offset+=4*length;
         }
-                /* TODO PASS 
-                attr->attr.typeDescriptor=(TypeDescriptor*)malloc(sizeof(TypeDescriptor));
-                genDeclDimList(ptr,attr->attr.typeDescriptor,ignoreArrayFirstDimSize);
-                TypeDescriptor *tmp=tpdes;
-                if(tmp->kind==SCALAR_TYPE_DESCRIPTOR)
-                    attr->attr.typeDescriptor->properties.arrayProperties.elementType=tmp->properties.dataType;
-                else if(tmp->kind==ARRAY_TYPE_DESCRIPTOR){
-                    int tpdim=tmp->properties.arrayProperties.dimension;
-                    int iddim=attr->attr.typeDescriptor->properties.arrayProperties.dimension;
-                
-                    attr->attr.typeDescriptor->properties.arrayProperties.elementType=tmp->properties.arrayProperties.elementType;
-                    attr->attr.typeDescriptor->properties.arrayProperties.dimension=tpdim+iddim;
-                    memcpy(attr->attr.typeDescriptor->properties.arrayProperties.sizeInEachDimension+iddim,tmp->properties.arrayProperties.sizeInEachDimension,tpdim*sizeof(int));
-                }     
-                */          
-
         if(offset > arsize) arsize=offset;
         ptr = ptr->rightSibling;
     }
@@ -390,62 +450,33 @@ void genGlobalDeclareIdList(AST_NODE* declarationNode)  {
     while(ptr) {
         char* name = ptr->semantic_value.identifierSemanticValue.identifierName;
         fprintf(output, "\t.globl  %s\n", name);
-        ptr->semantic_value.identifierSemanticValue.symbolTableEntry->offset=0;
-        
+        SymbolTableEntry *entry=ptr->semantic_value.identifierSemanticValue.symbolTableEntry;
+        entry->offset=0;
         int val;
         float f;
-        switch(ptr->semantic_value.identifierSemanticValue.kind){
-            case NORMAL_ID:
-                fprintf(output, "\t.section  .sbss\n\t.align  2\n");
-                fprintf(output, "\t.type %s, @object\n", name);
-                fprintf(output, "\t.size %s, 4\n", name);
-                fprintf(output, "%s:\n", name);
-                fprintf(output, "\t.zero 4\n");
-                break;
-            case WITH_INIT_ID:
-                f = ptr->child->semantic_value.const1->const_u.fval;
-                val = (typeNode->dataType == INT_TYPE ? ptr->child->semantic_value.const1->const_u.intval : *(unsigned*)&f);
-                fprintf(output, "\t.section  .sdata\n\t.align  2\n");
-                fprintf(output, "\t.type %s, @object\n", name);
-                fprintf(output, "\t.size %s, 4\n", name);
-                fprintf(output, "%s:\n", name);
-                fprintf(output, "\t.word %d\n", val);
-                //processExprRelatedNode(ptr->child);
-                break;
-            case ARRAY_ID:
-                /* TODO PASS 
-                attr->attr.typeDescriptor=(TypeDescriptor*)malloc(sizeof(TypeDescriptor));
-                genDeclDimList(ptr,attr->attr.typeDescriptor,ignoreArrayFirstDimSize);
-                TypeDescriptor *tmp=tpdes;
-                if(tmp->kind==SCALAR_TYPE_DESCRIPTOR)
-                    attr->attr.typeDescriptor->properties.arrayProperties.elementType=tmp->properties.dataType;
-                else if(tmp->kind==ARRAY_TYPE_DESCRIPTOR){
-                    int tpdim=tmp->properties.arrayProperties.dimension;
-                    int iddim=attr->attr.typeDescriptor->properties.arrayProperties.dimension;
-                
-                    attr->attr.typeDescriptor->properties.arrayProperties.elementType=tmp->properties.arrayProperties.elementType;
-                    attr->attr.typeDescriptor->properties.arrayProperties.dimension=tpdim+iddim;
-                    memcpy(attr->attr.typeDescriptor->properties.arrayProperties.sizeInEachDimension+iddim,tmp->properties.arrayProperties.sizeInEachDimension,tpdim*sizeof(int));
-                }     
-                m(_ _)m
-                <(_ _)>
-                m(_ _)m
-                <(_ _)>
-                M(_ _)M
-                <(_ _)>
-                m(_ _)m
-                <(_ _)>
-                M(_ _)M
-                <(_ _)>
-                m(_ _)m
-                M(_ _)M
-                <(_ _)>
-                m(_ _)m
-                M(_ _)M
-                */               
-                break;
-            default:
-                assert(0);
+        if(ptr->semantic_value.identifierSemanticValue.kind==WITH_INIT_ID) {
+            f = ptr->child->semantic_value.const1->const_u.fval;
+            val = (typeNode->dataType == INT_TYPE ? ptr->child->semantic_value.const1->const_u.intval : *(unsigned*)&f);
+            fprintf(output, "\t.section  .sdata\n\t.align  2\n");
+            fprintf(output, "\t.type %s, @object\n", name);
+            fprintf(output, "\t.size %s, 4\n", name);
+            fprintf(output, "%s:\n", name);
+            fprintf(output, "\t.word %d\n", val);
+        }
+        else if(entry->attribute->attr.typeDescriptor->kind==ARRAY_TYPE_DESCRIPTOR){
+            int length=entry->attribute->attr.typeDescriptor->properties.arrayProperties.sizeInEachDimension[0];
+            fprintf(output, "\t.section  .sbss\n\t.align  2\n");
+            fprintf(output, "\t.type %s, @object\n", name);
+            fprintf(output, "\t.size %s, %d\n", name,length*4);
+            fprintf(output, "%s:\n", name);
+            fprintf(output, "\t.zero %d\n",length*4);
+        }
+        else{
+            fprintf(output, "\t.section  .sbss\n\t.align  2\n");
+            fprintf(output, "\t.type %s, @object\n", name);
+            fprintf(output, "\t.size %s, 4\n", name);
+            fprintf(output, "%s:\n", name);
+            fprintf(output, "\t.zero 4\n");
         }
         ptr = ptr->rightSibling;
     }
@@ -485,7 +516,7 @@ void genDeclareFunction(AST_NODE* declarationNode) {
     gen_epilogue(name->semantic_value.identifierSemanticValue.identifierName);
 }
 void genDeclDimList(AST_NODE* variableDeclDimList, TypeDescriptor* typeDescriptor, int ignoreFirstDimSize) {
-	// giver TODO
+	// giver TODO nothing
 }
 void genBlockNode(AST_NODE* blockNode) {
     int _offset = offset;
@@ -606,25 +637,45 @@ void genAssignmentStmt(AST_NODE* assignmentNode) {
     AST_NODE *var_ref = assignmentNode->child, *relop_expr = var_ref->rightSibling;
     genExprRelatedNode(relop_expr);
     genVariableLValue(var_ref);
-    int lreg = regs[var_ref->regnumber].id, rreg = regs[relop_expr->regnumber].id;    
-    if(var_ref->dataType == INT_TYPE) {
-        if(relop_expr->dataType == FLOAT_TYPE) {
+    if(var_ref->regnumber==-1){
+        genArraySubscript(var_ref->child);
+        SymbolTableEntry *entry=var_ref->semantic_value.identifierSemanticValue.symbolTableEntry;
+        int ireg=var_ref->child->regnumber,rreg=relop_expr->regnumber;
+        if(var_ref->dataType == INT_TYPE&&relop_expr->dataType==FLOAT_TYPE) {
             int ttmp = get_reg(NULL, VAR_INT); regs[ttmp].status = STATUS_DONE;
             fprintf(output, "\tfmv.x.w %s, %s\n", get_reg_name(ttmp), get_reg_name(rreg));
             rreg = ttmp;
-        } 
-        fprintf(output, "\tmv %s, %s\n", get_reg_name(lreg), get_reg_name(rreg));
-    }
-    else {
-        if(relop_expr->dataType == INT_TYPE) {
+        }
+        else if(var_ref->dataType==FLOAT_TYPE&&relop_expr->dataType==INT_TYPE){
             int ttmp = get_reg(NULL, VAR_FLOAT); regs[ttmp].status = STATUS_DONE;
             fprintf(output, "\tfmv.w.x %s, %s\n", get_reg_name(ttmp), get_reg_name(rreg));
             rreg = ttmp;
-        } 
-        fprintf(output, "\tfmv.s %s, %s\n", get_reg_name(lreg), get_reg_name(rreg));
+        }
+        if(entry->offset) store_reg(rreg,entry->offset,ireg);
+        else store_global_reg(rreg,entry->name,ireg);
+        regs[ireg].status=STATUS_DONE; regs[relop_expr->regnumber].status=STATUS_DONE;
     }
-    regs[var_ref->regnumber].dirty = 1; 
-    regs[var_ref->regnumber].status=regs[relop_expr->regnumber].status=STATUS_DONE;
+    else{
+        int lreg = regs[var_ref->regnumber].id, rreg = regs[relop_expr->regnumber].id;    
+        if(var_ref->dataType == INT_TYPE) {
+            if(relop_expr->dataType == FLOAT_TYPE) {
+                int ttmp = get_reg(NULL, VAR_INT); regs[ttmp].status = STATUS_DONE;
+                fprintf(output, "\tfmv.x.w %s, %s\n", get_reg_name(ttmp), get_reg_name(rreg));
+                rreg = ttmp;
+            } 
+            fprintf(output, "\tmv %s, %s\n", get_reg_name(lreg), get_reg_name(rreg));
+        }
+        else {
+            if(relop_expr->dataType == INT_TYPE) {
+                int ttmp = get_reg(NULL, VAR_FLOAT); regs[ttmp].status = STATUS_DONE;
+                fprintf(output, "\tfmv.w.x %s, %s\n", get_reg_name(ttmp), get_reg_name(rreg));
+                rreg = ttmp;
+            } 
+            fprintf(output, "\tfmv.s %s, %s\n", get_reg_name(lreg), get_reg_name(rreg));
+        }
+        regs[var_ref->regnumber].dirty = 1; 
+        regs[var_ref->regnumber].status=regs[relop_expr->regnumber].status=STATUS_DONE;
+    }
 }
 void genIfStmt(AST_NODE* ifNode) {
     /*
@@ -940,7 +991,7 @@ void genExprNode(AST_NODE* exprNode) {
                     fprintf(output, "\tneg %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg].id));
                 }
                 else {
-                    fprintf(output, "\tsnez %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg].id)); // UNARY_OP_LOGICAL_NEGATION
+                    fprintf(output, "\tseqz %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg].id)); // UNARY_OP_LOGICAL_NEGATION
                 }
             }
             else {
@@ -953,15 +1004,27 @@ void genExprNode(AST_NODE* exprNode) {
         }
     }
 }
+void genArraySubscript(AST_NODE* ptr){
+    /* TODO multi dimension */
+    genExprRelatedNode(ptr); regs[ptr->regnumber].status=STATUS_DONE;
+    int ireg=get_reg(NULL,VAR_INT);
+    fprintf(output,"\tslli %s,%s,2\n",get_reg_name(regs[ireg].id),get_reg_name(regs[ptr->regnumber].id));
+    ptr->regnumber=ireg;
+}
 void genVariableLValue(AST_NODE* idNode) {
-	genVariableRValue(idNode);
+    if(idNode->semantic_value.identifierSemanticValue.kind==ARRAY_ID) idNode->regnumber=-1;
+    else genVariableRValue(idNode);
 }
 void genVariableRValue(AST_NODE* idNode) {
 	SymbolTableEntry *entry=idNode->semantic_value.identifierSemanticValue.symbolTableEntry;
     TypeDescriptor* tpdes=idNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
-    if(idNode->semantic_value.identifierSemanticValue.kind==ARRAY_ID||tpdes->kind==ARRAY_TYPE_DESCRIPTOR){
+    if(idNode->semantic_value.identifierSemanticValue.kind==ARRAY_ID){
         /* giver TODO */
-        assert(0);
+        genArraySubscript(idNode->child);
+        int ireg=idNode->child->regnumber; regs[ireg].status=STATUS_DONE;
+        idNode->regnumber=get_reg(NULL,tpdes->properties.arrayProperties.elementType==INT_TYPE?VAR_INT:VAR_FLOAT);
+        if(entry->offset) load_reg(idNode->regnumber,entry->offset,ireg);
+        else load_global_reg(idNode->regnumber,entry->name,ireg);
     }
     else{
         DATA_TYPE tp=tpdes->properties.dataType;
