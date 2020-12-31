@@ -708,8 +708,9 @@ void processExprNode(AST_NODE* exprNode) {
         }
         else {
             exprNode->dataType = getBiggerType(lc->dataType, rc->dataType);
-            if(exprNode->semantic_value.exprSemanticValue.op.binaryOp>=4)
+            if(exprNode->semantic_value.exprSemanticValue.op.binaryOp>=4) {
                 exprNode->dataType=INT_TYPE;
+            }
             if((lc->nodeType == CONST_VALUE_NODE || (lc->nodeType == EXPR_NODE && lc->semantic_value.exprSemanticValue.isConstEval)) && \
                 (rc->nodeType == CONST_VALUE_NODE || (rc->nodeType == EXPR_NODE && rc->semantic_value.exprSemanticValue.isConstEval))) {
                     exprNode->semantic_value.exprSemanticValue.isConstEval = evaluateExprValue(exprNode);
@@ -930,7 +931,6 @@ void processGeneralNode(AST_NODE *node) {
             else if(node->nodeType == NONEMPTY_ASSIGN_EXPR_LIST_NODE) checkAssignOrExpr(ptr);
             else if(node->nodeType == NONEMPTY_RELOP_EXPR_LIST_NODE) processExprRelatedNode(ptr);
             if(ptr->dataType == ERROR_TYPE) error=1;
-            node->dataType = ptr->dataType;
             ptr = ptr->rightSibling;
         }
         if(error) node->dataType=ERROR_TYPE;
