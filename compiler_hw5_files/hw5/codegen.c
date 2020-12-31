@@ -932,15 +932,15 @@ void genExprNode(AST_NODE* exprNode) {
             
             if(type == VAR_INT) {
                 if(op == UNARY_OP_NEGATIVE) {
-                    fprintf(output, "\tneg %s %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg].id));
+                    fprintf(output, "\tneg %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg].id));
                 }
                 else {
-                    fprintf(output, "\tsnez %s %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg].id)); // UNARY_OP_LOGICAL_NEGATION
+                    fprintf(output, "\tsnez %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg].id)); // UNARY_OP_LOGICAL_NEGATION
                 }
             }
             else {
                 if(op == UNARY_OP_NEGATIVE) {
-                    fprintf(output, "\tfneg.s %s %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg].id));
+                    fprintf(output, "\tfneg.s %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg].id));
                 }
             }
 
