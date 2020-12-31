@@ -443,8 +443,8 @@ void genDeclareIdList(AST_NODE* declarationNode) {
             // float and int are handled together
             entry->offset=offset+=4;
             genExprRelatedNode(ptr->child);
-            int reg_val = ptr->child->regnumber; regs[reg_val].status=STATUS_DONE;
-            store_reg(reg_val, offset,-1);
+            int reg_val = ptr->child->regnumber;
+            store_reg(reg_val, offset,-1); regs[reg_val].status=STATUS_DONE;
         }
         else if(entry->attribute->attr.typeDescriptor->kind==ARRAY_TYPE_DESCRIPTOR){
             /* TODO multi dimension */
@@ -660,12 +660,12 @@ void genAssignmentStmt(AST_NODE* assignmentNode) {
         SymbolTableEntry *entry=var_ref->semantic_value.identifierSemanticValue.symbolTableEntry;
         int ireg=var_ref->child->regnumber,rreg=relop_expr->regnumber;
         if(var_ref->dataType == INT_TYPE&&relop_expr->dataType==FLOAT_TYPE) {
-            int ttmp = get_reg(NULL, VAR_INT); regs[ttmp].status = STATUS_DONE;
+            int ttmp = get_reg(NULL, VAR_INT); regs[rreg].status = STATUS_DONE;
             fprintf(output, "\tfmv.x.w %s, %s\n", get_reg_name(ttmp), get_reg_name(rreg));
             rreg = ttmp;
         }
         else if(var_ref->dataType==FLOAT_TYPE&&relop_expr->dataType==INT_TYPE){
-            int ttmp = get_reg(NULL, VAR_FLOAT); regs[ttmp].status = STATUS_DONE;
+            int ttmp = get_reg(NULL, VAR_FLOAT); regs[rreg].status = STATUS_DONE;
             fprintf(output, "\tfmv.w.x %s, %s\n", get_reg_name(ttmp), get_reg_name(rreg));
             rreg = ttmp;
         }
@@ -677,7 +677,7 @@ void genAssignmentStmt(AST_NODE* assignmentNode) {
         int lreg = regs[var_ref->regnumber].id, rreg = regs[relop_expr->regnumber].id;    
         if(var_ref->dataType == INT_TYPE) {
             if(relop_expr->dataType == FLOAT_TYPE) {
-                int ttmp = get_reg(NULL, VAR_INT); regs[ttmp].status = STATUS_DONE;
+                int ttmp = get_reg(NULL, VAR_INT); regs[rreg].status = STATUS_DONE;
                 fprintf(output, "\tfmv.x.w %s, %s\n", get_reg_name(ttmp), get_reg_name(rreg));
                 rreg = ttmp;
             } 
@@ -685,7 +685,7 @@ void genAssignmentStmt(AST_NODE* assignmentNode) {
         }
         else {
             if(relop_expr->dataType == INT_TYPE) {
-                int ttmp = get_reg(NULL, VAR_FLOAT); regs[ttmp].status = STATUS_DONE;
+                int ttmp = get_reg(NULL, VAR_FLOAT); regs[rreg].status = STATUS_DONE;
                 fprintf(output, "\tfmv.w.x %s, %s\n", get_reg_name(ttmp), get_reg_name(rreg));
                 rreg = ttmp;
             } 
@@ -853,7 +853,7 @@ void genConst(AST_NODE* node) {
     }
 
     if(type == VAR_FLOAT) {
-        int regg = get_reg(NULL, VAR_FLOAT);
+        int regg = get_reg(NULL, VAR_FLOAT); regs[reg].status=STATUS_DONE;
         fprintf(output, "\tfmv.w.x %s, %s\n", get_reg_name(regs[regg].id), get_reg_name(regs[reg].id));
         reg = regg;
     }
@@ -873,8 +873,6 @@ void genExprNode(AST_NODE* exprNode) {
 
         reg_var type = exprNode->dataType == INT_TYPE ? VAR_INT : VAR_FLOAT;
         int reg1 = lc->regnumber, reg2 = rc->regnumber;
-
-        regs[reg1].status=STATUS_DONE; regs[reg2].status=STATUS_DONE;
 
         if(type == VAR_INT) {
             int reg0 = get_reg(NULL, type);
@@ -989,6 +987,7 @@ void genExprNode(AST_NODE* exprNode) {
                     assert(0);
             }
         }
+        regs[reg1].status=STATUS_DONE; regs[reg2].status=STATUS_DONE;
     }
     else {
         AST_NODE *rc = exprNode->child; 
@@ -1020,12 +1019,13 @@ void genExprNode(AST_NODE* exprNode) {
 
             exprNode->regnumber = reg0;
         }
+        regs[reg].status=STATUS_DONE;
     }
 }
 void genArraySubscript(AST_NODE* ptr){
     /* TODO multi dimension */
-    genExprRelatedNode(ptr); regs[ptr->regnumber].status=STATUS_DONE;
-    int ireg=get_reg(NULL,VAR_INT);
+    genExprRelatedNode(ptr); 
+    int ireg=get_reg(NULL,VAR_INT); regs[ptr->regnumber].status=STATUS_DONE;
     fprintf(output,"\tslli %s,%s,2\n",get_reg_name(regs[ireg].id),get_reg_name(regs[ptr->regnumber].id));
     ptr->regnumber=ireg;
 }
@@ -1039,10 +1039,11 @@ void genVariableRValue(AST_NODE* idNode) {
     if(idNode->semantic_value.identifierSemanticValue.kind==ARRAY_ID){
         /* giver TODO */
         genArraySubscript(idNode->child);
-        int ireg=idNode->child->regnumber; regs[ireg].status=STATUS_DONE;
+        int ireg=idNode->child->regnumber; 
         idNode->regnumber=get_reg(NULL,tpdes->properties.arrayProperties.elementType==INT_TYPE?VAR_INT:VAR_FLOAT);
         if(entry->offset) load_reg(idNode->regnumber,entry->offset,ireg);
         else load_global_reg(idNode->regnumber,entry->name,ireg);
+        regs[ireg].status=STATUS_DONE;
     }
     else{
         DATA_TYPE tp=tpdes->properties.dataType;
