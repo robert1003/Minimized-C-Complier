@@ -249,6 +249,9 @@ void clear_expired_regs(){
 
 void gen_head(char *name) {
     fprintf(output,"\t.text\n\t.align 1\n\t.globl %s\n\t.type %s, @function\n%s:\n",name,name,name);
+    if(name=="MAIN"){
+        fprintf(output,"\tfmv.w.x %s,%s\n",get_reg_name(0),get_reg_name(32));
+    }
     flush_regs();
 }
 
@@ -270,7 +273,7 @@ void initregs(){
     for(int i=9;i<=9;i++) initreg(i,TYPE_CALLEE,VAR_INT);
     for(int i=18;i<=27;i++) initreg(i,TYPE_CALLEE,VAR_INT);
     for(int i=28;i<=31;i++) initreg(i,TYPE_CALLER,VAR_INT);
-    for(int i=0;i<=7;i++) initreg(i+32,TYPE_CALLER,VAR_FLOAT);
+    for(int i=1;i<=7;i++) initreg(i+32,TYPE_CALLER,VAR_FLOAT);
     for(int i=8;i<=9;i++) initreg(i+32,TYPE_CALLEE,VAR_FLOAT);
     for(int i=18;i<=27;i++) initreg(i+32,TYPE_CALLEE,VAR_FLOAT);
     for(int i=28;i<=31;i++) initreg(i+32,TYPE_CALLER,VAR_FLOAT);
@@ -413,7 +416,7 @@ void genDeclarationNode(AST_NODE* declarationNode) {
 
     switch(declarationNode->semantic_value.declSemanticValue.kind) {
         case TYPE_DECL:
-            genDeclareIdList(declarationNode);
+            //genDeclareIdList(declarationNode);
             break;
         case VARIABLE_DECL:
             genDeclareIdList(declarationNode);
@@ -429,6 +432,7 @@ void genDeclarationNode(AST_NODE* declarationNode) {
     }
 }
 void genDeclareIdList(AST_NODE* declarationNode) {
+    if(declarationNode->semantic_value.declSemanticValue.kind==TYPE_DECL) return;
 	AST_NODE* typeNode = declarationNode->child;
     TypeDescriptor *tpdes = typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
     AST_NODE* ptr = typeNode->rightSibling;
@@ -437,7 +441,7 @@ void genDeclareIdList(AST_NODE* declarationNode) {
         SymbolTableEntry *entry=ptr->semantic_value.identifierSemanticValue.symbolTableEntry;
         if(ptr->semantic_value.identifierSemanticValue.kind==WITH_INIT_ID) {
             // float and int are handled together
-            ptr->semantic_value.identifierSemanticValue.symbolTableEntry->offset=offset+=4;
+            entry->offset=offset+=4;
             genExprRelatedNode(ptr->child);
             int reg_val = ptr->child->regnumber; regs[reg_val].status=STATUS_DONE;
             store_reg(reg_val, offset,-1);
@@ -445,14 +449,15 @@ void genDeclareIdList(AST_NODE* declarationNode) {
         else if(entry->attribute->attr.typeDescriptor->kind==ARRAY_TYPE_DESCRIPTOR){
             /* TODO multi dimension */
             int length=entry->attribute->attr.typeDescriptor->properties.arrayProperties.sizeInEachDimension[0];
-            ptr->semantic_value.identifierSemanticValue.symbolTableEntry->offset=offset+=4*length;
+            entry->offset=offset+=4*length;
         }
-        else ptr->semantic_value.identifierSemanticValue.symbolTableEntry->offset=offset+=4;
+        else entry->offset=offset+=4;
         if(offset > arsize) arsize=offset;
         ptr = ptr->rightSibling;
     }
 }
 void genGlobalDeclareIdList(AST_NODE* declarationNode)  {
+    if(declarationNode->semantic_value.declSemanticValue.kind==TYPE_DECL) return;
     AST_NODE* typeNode = declarationNode->child;
     TypeDescriptor *tpdes = typeNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
 
@@ -606,6 +611,7 @@ void genWhileStmt(AST_NODE* whileNode) {
     */
     int cnt = g_cnt++;
 	AST_NODE *condition = whileNode->child, *stmt = condition->rightSibling;
+    flush_regs();
     fprintf(output, "_WHILE_%d:\n", cnt); 
     flush_regs();
     genAssignOrExpr(condition);
@@ -632,6 +638,7 @@ void genForStmt(AST_NODE* forNode) {
     AST_NODE *assign = forNode->child, *condition = assign->rightSibling, \
         *loop = condition->rightSibling, *stmt = loop->rightSibling;
     genGeneralNode(assign);
+    flush_regs();
     fprintf(output, "_FOR_%d:\n", cnt);
     flush_regs();
     genGeneralNode(condition);
@@ -701,6 +708,7 @@ void genIfStmt(AST_NODE* ifNode) {
     */
     int cnt = g_cnt++;
 	AST_NODE *condition = ifNode->child, *if_stmt = condition->rightSibling, *else_stmt = if_stmt->rightSibling;
+    flush_regs();
     fprintf(output, "_IF_%d:\n", cnt);
     flush_regs();
     genAssignOrExpr(condition);
@@ -772,7 +780,6 @@ void genFunctionCall(AST_NODE* functionCallNode) {
     if(functionCallNode->dataType != VOID_TYPE) {
         int reg = get_reg(NULL, (functionCallNode->dataType == INT_TYPE ? VAR_INT : VAR_FLOAT));
         if(functionCallNode->dataType == INT_TYPE) {
-            fprintf(stderr, "%s return value at %s\n", name, get_reg_name(regs[reg].id));
             fprintf(output, "\tmv %s, %s\n", get_reg_name(regs[reg].id), get_reg_name(10));
         }
         else {
