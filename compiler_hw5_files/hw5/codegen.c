@@ -707,12 +707,12 @@ void genAssignmentStmt(AST_NODE* assignmentNode) {
         int ireg=var_ref->child->regnumber,rreg=relop_expr->regnumber;
         if(var_ref->dataType == INT_TYPE&&relop_expr->dataType==FLOAT_TYPE) {
             int ttmp = get_reg(NULL, VAR_INT); regs[rreg].status = STATUS_DONE;
-            fprintf(output, "\tfcvt.s.w %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
+            fprintf(output, "\tfcvt.w.s %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
             rreg = ttmp;
         }
         else if(var_ref->dataType==FLOAT_TYPE&&relop_expr->dataType==INT_TYPE){
             int ttmp = get_reg(NULL, VAR_FLOAT); regs[rreg].status = STATUS_DONE;
-            fprintf(output, "\tfcvt.s.x %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
+            fprintf(output, "\tfcvt.s.w %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
             rreg = ttmp;
         }
         if(entry->offset) store_reg(rreg,entry->offset,ireg);
@@ -724,7 +724,7 @@ void genAssignmentStmt(AST_NODE* assignmentNode) {
         if(var_ref->dataType == INT_TYPE) {
             if(relop_expr->dataType == FLOAT_TYPE) {
                 int ttmp = get_reg(NULL, VAR_INT); regs[rreg].status = STATUS_DONE;
-                fprintf(output, "\tfcvt.s.w %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
+                fprintf(output, "\tfcvt.w.s %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
                 rreg = ttmp;
             }
             fprintf(output, "\tmv %s, %s\n", get_reg_name(regs[lreg].id), get_reg_name(regs[rreg].id));
@@ -732,7 +732,7 @@ void genAssignmentStmt(AST_NODE* assignmentNode) {
         else {
             if(relop_expr->dataType == INT_TYPE) {
                 int ttmp = get_reg(NULL, VAR_FLOAT); regs[rreg].status = STATUS_DONE;
-                fprintf(output, "\tfcvt.s.x %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
+                fprintf(output, "\tfcvt.s.w %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
                 rreg = ttmp;
             }
             fprintf(output, "\tfmv.s %s, %s\n", get_reg_name(regs[lreg].id), get_reg_name(regs[rreg].id));
