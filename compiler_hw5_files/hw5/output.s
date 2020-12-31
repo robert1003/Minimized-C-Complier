@@ -2,83 +2,65 @@
 	.section .sbss,"aw",@nobits
 	.text
 	.align 1
-	.globl _start_MAIN
-	.type _start_MAIN, @function
-_start_MAIN:
+	.globl MAIN
+	.type MAIN, @function
+MAIN:
+	fmv.w.x ft0,zero
 	sd ra,-8(sp)
 	sd fp,-16(sp)
 	addi fp,sp,-16
 	addi sp,sp,-16
-	addi sp,sp,-32
+	lui t0, 1953
+	addi t0, t0, 528
+	sub sp,sp,t0
 	sw s1,-4(fp)
-	sw s2,-8(fp)
-	fsw fs0,-12(fp)
-	fsw fs1,-16(fp)
-	lui t0,%hi(.LC5)
-	addi a0,t0,%lo(.LC5)
-	call _write_str
-	call _read_int
-	mv t0, a0
-	lw s1,-20(fp)
+	addi t0, zero, 0
+	lui t1, 977
+	addi t1, t1, -1784
+	sub t1,fp,t1
+	lw s1,0(t1)
 	mv s1, t0
-	lui t0,%hi(.LC5)
-	addi a0,t0,%lo(.LC5)
-	call _write_str
-	call _read_int
-	mv t0, a0
-	lw s2,-24(fp)
-	mv s2, t0
-	lui t0,%hi(.LC5)
-	addi a0,t0,%lo(.LC5)
-	call _write_str
-	call _read_float
-	fmv.s ft0, fa0
-	flw fs0,-28(fp)
-	fmv.s fs0, ft0
-	lui t0,%hi(.LC5)
-	addi a0,t0,%lo(.LC5)
-	call _write_str
-	call _read_float
-	fmv.s ft0, fa0
-	flw fs1,-32(fp)
-	fmv.s fs1, ft0
+	addi t0, zero, 123
+	addi t1, zero, 123
+	slli t2,t1,2
+	lui t1, 977
+	addi t1, t1, -1788
+	sub t1,fp,t1
+	add t2,t2,t1
+	sw t0,0(t2)
+	addi t0, zero, 456
+	addi t1, zero, 456
+	slli t2,t1,2
+	lui t1, 1953
+	addi t1, t1, 520
+	sub t1,fp,t1
+	add t2,t2,t1
+	sw t0,0(t2)
 	mv a0,s1
 	jal _write_int
-	lui t0,%hi(.LC6)
-	addi a0,t0,%lo(.LC6)
-	call _write_str
-	mv a0,s2
+	addi t0, zero, 123
+	slli t1,t0,2
+	lui t2, 977
+	addi t2, t2, -1788
+	sub t2,fp,t2
+	add t1,t1,t2
+	lw t0,0(t1)
+	mv a0,t0
 	jal _write_int
-	lui t0,%hi(.LC6)
-	addi a0,t0,%lo(.LC6)
-	call _write_str
-	fmv.s fa0,fs0
-	jal _write_float
-	lui t0,%hi(.LC6)
-	addi a0,t0,%lo(.LC6)
-	call _write_str
-	fmv.s fa0,fs1
-	jal _write_float
-	lui t0,%hi(.LC6)
-	addi a0,t0,%lo(.LC6)
-	call _write_str
-	addi t0, zero, 0
-	mv a0, t0
-	j main_EXIT_
-main_EXIT_:
-	flw fs1,-16(fp)
-	flw fs0,-12(fp)
-	lw s2,-8(fp)
+	addi t0, zero, 456
+	slli t1,t0,2
+	lui t2, 1953
+	addi t2, t2, 520
+	sub t2,fp,t2
+	add t1,t1,t2
+	lw t0,0(t1)
+	mv a0,t0
+	jal _write_int
+MAIN_EXIT_:
 	lw s1,-4(fp)
 	ld ra,8(fp)
 	addi sp,fp,16
 	ld fp,0(fp)
 	jr ra
-	.size main, .-main
+	.size MAIN, .-MAIN
 	.section .rodata
-	.align 3
-.LC6:
-	.string "\n\000"
-	.align 3
-.LC5:
-	.string "input:\000"

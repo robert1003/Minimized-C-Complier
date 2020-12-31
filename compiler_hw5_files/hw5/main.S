@@ -5,7 +5,7 @@
 	.text
 	.section	.rodata
 	.align	3
-.LC0:
+.LLC0:
 	.string	"%s"
 	.text
 	.align	1
@@ -18,8 +18,8 @@ _write_str:
 	addi	s0,sp,32
 	sd	a0,-24(s0)
 	ld	a1,-24(s0)
-	lui	a5,%hi(.LC0)
-	addi	a0,a5,%lo(.LC0)
+	lui	a5,%hi(.LLC0)
+	addi	a0,a5,%lo(.LLC0)
 	call	printf
 	nop
 	ld	ra,24(sp)
@@ -29,7 +29,7 @@ _write_str:
 	.size	_write_str, .-_write_str
 	.section	.rodata
 	.align	3
-.LC1:
+.LLC1:
 	.string	"%d"
 	.text
 	.align	1
@@ -44,8 +44,8 @@ _write_int:
 	sw	a5,-20(s0)
 	lw	a5,-20(s0)
 	mv	a1,a5
-	lui	a5,%hi(.LC1)
-	addi	a0,a5,%lo(.LC1)
+	lui	a5,%hi(.LLC1)
+	addi	a0,a5,%lo(.LLC1)
 	call	printf
 	nop
 	ld	ra,24(sp)
@@ -55,7 +55,7 @@ _write_int:
 	.size	_write_int, .-_write_int
 	.section	.rodata
 	.align	3
-.LC2:
+.LLC2:
 	.string	"%f"
 	.text
 	.align	1
@@ -70,8 +70,8 @@ _write_float:
 	flw	fa5,-20(s0)
 	fcvt.d.s	fa5,fa5
 	fmv.x.d	a1,fa5
-	lui	a5,%hi(.LC2)
-	addi	a0,a5,%lo(.LC2)
+	lui	a5,%hi(.LLC2)
+	addi	a0,a5,%lo(.LLC2)
 	call	printf
 	nop
 	ld	ra,24(sp)
@@ -81,7 +81,7 @@ _write_float:
 	.size	_write_float, .-_write_float
 	.section	.rodata
 	.align	3
-.LC3:
+.LLC3:
 	.string	"%d"
 	.text
 	.align	1
@@ -95,8 +95,8 @@ _read_int:
 	sw	zero,-20(s0)
 	addi	a5,s0,-20
 	mv	a1,a5
-	lui	a5,%hi(.LC3)
-	addi	a0,a5,%lo(.LC3)
+	lui	a5,%hi(.LLC3)
+	addi	a0,a5,%lo(.LLC3)
 	call	__isoc99_scanf
 	lw	a5,-20(s0)
 	mv	a0,a5
@@ -116,8 +116,8 @@ _read_float:
 	sw	zero,-20(s0)
 	addi	a5,s0,-20
 	mv	a1,a5
-	lui	a5,%hi(.LC2)
-	addi	a0,a5,%lo(.LC2)
+	lui	a5,%hi(.LLC2)
+	addi	a0,a5,%lo(.LLC2)
 	call	__isoc99_scanf
 	flw	fa5,-20(s0)
 	fmv.s	fa0,fa5
@@ -134,7 +134,7 @@ main:
 	sd	ra,8(sp)
 	sd	s0,0(sp)
 	addi	s0,sp,16
-	call	_start_MAIN
+	call	MAIN
 	li	a5,0
 	mv	a0,a5
 	ld	ra,8(sp)

@@ -6,6 +6,12 @@ float SquareRoot() {
   r = n; 
   iter = 0;
   while (r - l > 0.0001 && iter < 100) {
+    write(iter);
+    write(" ");
+    write(r);
+    write(" ");
+    write(l);
+    write("\n");
     mid = 0.5 * (l + r);
     if (mid * mid < n) l = mid;
     else r = mid;
