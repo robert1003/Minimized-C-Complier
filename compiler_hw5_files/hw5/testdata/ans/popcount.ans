@@ -1,5 +1,3 @@
-gcc -g -c codegen.c
-gcc -g -c parser.tab.c
 gcc -g -o parser parser.tab.o alloc.o functions.o symbolTable.o semanticAnalysis.o codegen.o -lfl 
 Parsing completed. No errors found.
 1 1
