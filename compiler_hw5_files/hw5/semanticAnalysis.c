@@ -678,6 +678,7 @@ int evaluateExprValue(AST_NODE* exprNode) {
                     exprNode->semantic_value.exprSemanticValue.constEvalValue.fValue = -rv;
                     break;
                 case UNARY_OP_LOGICAL_NEGATION:
+                    exprNode->dataType = INT_TYPE;
                     exprNode->semantic_value.exprSemanticValue.constEvalValue.fValue = !rv;
                     break;
                 default:
@@ -707,6 +708,8 @@ void processExprNode(AST_NODE* exprNode) {
         }
         else {
             exprNode->dataType = getBiggerType(lc->dataType, rc->dataType);
+            if(exprNode->semantic_value.exprSemanticValue.op.binaryOp>=4)
+                exprNode->dataType=INT_TYPE;
             if((lc->nodeType == CONST_VALUE_NODE || (lc->nodeType == EXPR_NODE && lc->semantic_value.exprSemanticValue.isConstEval)) && \
                 (rc->nodeType == CONST_VALUE_NODE || (rc->nodeType == EXPR_NODE && rc->semantic_value.exprSemanticValue.isConstEval))) {
                     exprNode->semantic_value.exprSemanticValue.isConstEval = evaluateExprValue(exprNode);
@@ -730,6 +733,8 @@ void processExprNode(AST_NODE* exprNode) {
         }
         else {
             exprNode->dataType = rc->dataType;
+            if(exprNode->semantic_value.exprSemanticValue.op.unaryOp==UNARY_OP_LOGICAL_NEGATION)
+                exprNode->dataType=INT_TYPE;
             if(rc->nodeType == CONST_VALUE_NODE || (rc->nodeType == EXPR_NODE && rc->semantic_value.exprSemanticValue.isConstEval)) {
                 exprNode->semantic_value.exprSemanticValue.isConstEval = evaluateExprValue(exprNode);
             }
