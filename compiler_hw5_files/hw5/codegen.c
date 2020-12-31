@@ -599,9 +599,7 @@ void genAssignOrExpr(AST_NODE* assignOrExprRelatedNode) {
         else if(assignOrExprRelatedNode->semantic_value.stmtSemanticValue.kind == FUNCTION_CALL_STMT)
             genFunctionCall(assignOrExprRelatedNode);
         else if(assignOrExprRelatedNode->nodeType == IDENTIFIER_NODE) {
-            fprintf(stderr, "poop\n");
             genVariableRValue(assignOrExprRelatedNode);
-            fprintf(stderr, "poop\n");
             int reg0 = get_reg(NULL, VAR_INT);
             if(assignOrExprRelatedNode->dataType == INT_TYPE) {
                 fprintf(output, "\tsnez %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[assignOrExprRelatedNode->regnumber].id));
@@ -676,41 +674,39 @@ void genAssignmentStmt(AST_NODE* assignmentNode) {
         int ireg=var_ref->child->regnumber,rreg=relop_expr->regnumber;
         if(var_ref->dataType == INT_TYPE&&relop_expr->dataType==FLOAT_TYPE) {
             int ttmp = get_reg(NULL, VAR_INT); regs[rreg].status = STATUS_DONE;
-            fprintf(output, "\tfmv.x.w %s, %s\n", get_reg_name(ttmp), get_reg_name(rreg));
+            fprintf(output, "\tfmv.x.w %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
             rreg = ttmp;
         }
         else if(var_ref->dataType==FLOAT_TYPE&&relop_expr->dataType==INT_TYPE){
             int ttmp = get_reg(NULL, VAR_FLOAT); regs[rreg].status = STATUS_DONE;
-            fprintf(output, "\tfmv.w.x %s, %s\n", get_reg_name(ttmp), get_reg_name(rreg));
+            fprintf(output, "\tfmv.w.x %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
             rreg = ttmp;
         }
         if(entry->offset) store_reg(rreg,entry->offset,ireg);
         else store_global_reg(rreg,entry->name,ireg);
-        regs[ireg].status=STATUS_DONE; regs[relop_expr->regnumber].status=STATUS_DONE;
+        regs[ireg].status=STATUS_DONE; regs[rreg].status=STATUS_DONE;
     }
     else{
-        int lreg = regs[var_ref->regnumber].id, rreg = regs[relop_expr->regnumber].id;    
+        int lreg = var_ref->regnumber, rreg = relop_expr->regnumber;
         if(var_ref->dataType == INT_TYPE) {
             if(relop_expr->dataType == FLOAT_TYPE) {
                 int ttmp = get_reg(NULL, VAR_INT); regs[rreg].status = STATUS_DONE;
-                fprintf(output, "\tfmv.x.w %s, %s\n", get_reg_name(ttmp), get_reg_name(rreg));
+                fprintf(output, "\tfmv.x.w %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
                 rreg = ttmp;
-            } 
-            fprintf(output, "\tmv %s, %s\n", get_reg_name(lreg), get_reg_name(rreg));
+            }
+            fprintf(output, "\tmv %s, %s\n", get_reg_name(regs[lreg].id), get_reg_name(regs[rreg].id));
         }
         else {
             if(relop_expr->dataType == INT_TYPE) {
                 int ttmp = get_reg(NULL, VAR_FLOAT); regs[rreg].status = STATUS_DONE;
-                fprintf(output, "\tfmv.w.x %s, %s\n", get_reg_name(ttmp), get_reg_name(rreg));
+                fprintf(output, "\tfmv.w.x %s, %s\n", get_reg_name(regs[ttmp].id), get_reg_name(regs[rreg].id));
                 rreg = ttmp;
-            } 
-            fprintf(output, "\tfmv.s %s, %s\n", get_reg_name(lreg), get_reg_name(rreg));
+            }
+            fprintf(output, "\tfmv.s %s, %s\n", get_reg_name(regs[lreg].id), get_reg_name(regs[rreg].id));
         }
-        regs[var_ref->regnumber].dirty = 1; 
-        regs[var_ref->regnumber].status=regs[relop_expr->regnumber].status=STATUS_DONE;
+        regs[var_ref->regnumber].dirty = 1;
+        regs[var_ref->regnumber].status=regs[rreg].status=STATUS_DONE;
     }
-    regs[var_ref->regnumber].dirty = 1;
-    regs[var_ref->regnumber].status=regs[relop_expr->regnumber].status=STATUS_DONE;
 }
 void genIfStmt(AST_NODE* ifNode) {
     /*
