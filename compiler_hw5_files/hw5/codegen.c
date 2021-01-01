@@ -275,7 +275,7 @@ void clear_expired_regs(){
 
 void gen_head(char *name) {
     fprintf(output,"\t.text\n\t.align 1\n\t.globl %s\n\t.type %s, @function\n%s:\n",name,name,name);
-    if(strcmp(name, "MAIN") == 0){
+    if(strcmp(name, "_start_MAIN") == 0){
         fprintf(output,"\tfmv.w.x %s,%s\n",get_reg_name(32),get_reg_name(0));
     }
     flush_regs();
@@ -545,6 +545,9 @@ void genDeclareFunction(AST_NODE* declarationNode) {
     while(arsize&15) arsize+=4;
     flush_regs(); offset=0;
     meow=1; g_cnt=s_gcnt;
+    if(strcmp(name->semantic_value.identifierSemanticValue.identifierName, "MAIN")==0) {
+      name->semantic_value.identifierSemanticValue.identifierName = "_start_MAIN";
+    }
     gen_head(name->semantic_value.identifierSemanticValue.identifierName);
     gen_prologue(name->semantic_value.identifierSemanticValue.identifierName);
     symbolTable.currentLevel++;
