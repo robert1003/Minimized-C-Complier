@@ -665,10 +665,19 @@ void genWhileStmt(AST_NODE* whileNode) {
     flush_regs();
     genAssignOrExpr(condition);
     flush_regs();
-    fprintf(output, "\tbeqz %s, _EXIT_%d\n", get_reg_name(regs[condition->regnumber].id), cnt);
+    //fprintf(output, "\tbeqz %s, _EXIT_%d\n", get_reg_name(regs[condition->regnumber].id), cnt);
+    fprintf(output, "\tbnez %s, _WHILE_%d_tmp\n", get_reg_name(regs[condition->regnumber].id), cnt);
+    int reg = get_reg(NULL, VAR_INT); regs[reg].status = STATUS_DONE;
+    fprintf(output, "\tla %s, _EXIT_%d\n", get_reg_name(regs[reg].id), cnt);
+    fprintf(output, "\tjr %s\n", get_reg_name(regs[reg].id));
+    //fprintf(output, "\tj _EXIT_%d\n", cnt);
+    fprintf(output, "_WHILE_%d_tmp:\n", cnt);
     genStmtNode(stmt);
     flush_regs();
-    fprintf(output, "\tj _WHILE_%d\n", cnt);
+    reg = get_reg(NULL, VAR_INT); regs[reg].status = STATUS_DONE;
+    fprintf(output, "\tla %s, _WHILE_%d\n", get_reg_name(regs[reg].id), cnt);
+    fprintf(output, "\tjr %s\n", get_reg_name(regs[reg].id));
+    //fprintf(output, "\tj _WHILE_%d\n", cnt);
     fprintf(output, "_EXIT_%d:\n", cnt);
     flush_regs();
 }
@@ -692,11 +701,20 @@ void genForStmt(AST_NODE* forNode) {
     flush_regs();
     genGeneralNode(condition);
     flush_regs();
-    fprintf(output, "\tbeqz %s, _EXIT_%d\n", get_reg_name(regs[condition->regnumber].id), cnt);
+    //fprintf(output, "\tbeqz %s, _EXIT_%d\n", get_reg_name(regs[condition->regnumber].id), cnt);
+    fprintf(output, "\tbnez %s, _FOR_%d_tmp\n", get_reg_name(regs[condition->regnumber].id), cnt);
+    int reg = get_reg(NULL, VAR_INT); regs[reg].status = STATUS_DONE;
+    fprintf(output, "\tla %s, _EXIT_%d\n", get_reg_name(regs[reg].id), cnt);
+    fprintf(output, "\tjr %s\n", get_reg_name(regs[reg].id));
+    //fprintf(output, "\tj _EXIT_%d\n", cnt);
+    fprintf(output, "_FOR_%d_tmp:\n", cnt);
     genStmtNode(stmt); 
     genGeneralNode(loop);
     flush_regs();
-    fprintf(output, "\tj _FOR_%d\n", cnt);
+    reg = get_reg(NULL, VAR_INT); regs[reg].status = STATUS_DONE;
+    fprintf(output, "\tla %s, _FOR_%d\n", get_reg_name(regs[reg].id), cnt);
+    fprintf(output, "\tjr %s\n", get_reg_name(regs[reg].id));
+    //fprintf(output, "\tj _FOR_%d\n", cnt);
     fprintf(output, "_EXIT_%d:\n", cnt);
     flush_regs();
 }
@@ -762,10 +780,19 @@ void genIfStmt(AST_NODE* ifNode) {
     flush_regs();
     genAssignOrExpr(condition);
     flush_regs();
-    fprintf(output, "\tbeqz %s, _ELSE_%d\n", get_reg_name(regs[condition->regnumber].id), cnt);
+    //fprintf(output, "\tbeqz %s, _ELSE_%d\n", get_reg_name(regs[condition->regnumber].id), cnt);
+    fprintf(output, "\tbnez %s, _IF_%d_tmp\n", get_reg_name(regs[condition->regnumber].id), cnt);
+    int reg = get_reg(NULL, VAR_INT); regs[reg].status = STATUS_DONE;
+    fprintf(output, "\tla %s, _ELSE_%d\n", get_reg_name(regs[reg].id), cnt);
+    fprintf(output, "\tjr %s\n", get_reg_name(regs[reg].id));
+    //fprintf(output, "\tj _ELSE_%d\n", cnt);
+    fprintf(output, "_IF_%d_tmp:\n", cnt);
     genStmtNode(if_stmt);
     flush_regs();
-    fprintf(output, "\tj _EXIT_%d\n", cnt);
+    reg = get_reg(NULL, VAR_INT); regs[reg].status = STATUS_DONE;
+    fprintf(output, "\tla %s, _EXIT_%d\n", get_reg_name(regs[reg].id), cnt);
+    fprintf(output, "\tjr %s\n", get_reg_name(regs[reg].id));
+    //fprintf(output, "\tj _EXIT_%d\n", cnt);
     fprintf(output, "_ELSE_%d:\n", cnt);
     flush_regs();
     genStmtNode(else_stmt);
@@ -781,7 +808,10 @@ void genWriteFunction(AST_NODE* functionCallNode) {
         int reg=param->regnumber;
         fprintf(output,"\tmv a0,%s\n",get_reg_name(regs[reg].id)); regs[reg].status=STATUS_DONE;
         save_caller_regs();
-        fprintf(output,"\tjal _write_int\n");
+        reg = get_reg(NULL, VAR_INT); regs[reg].status = STATUS_DONE;
+        fprintf(output, "\tla %s, _write_int\n", get_reg_name(regs[reg].id));
+        fprintf(output, "\tjalr %s\n", get_reg_name(regs[reg].id));
+        //fprintf(output,"\tjal _write_int\n");
         restore_caller_regs();
 
     }
@@ -789,7 +819,10 @@ void genWriteFunction(AST_NODE* functionCallNode) {
         int reg=param->regnumber;
         fprintf(output,"\tfmv.s fa0,%s\n",get_reg_name(regs[reg].id)); regs[reg].status=STATUS_DONE;
         save_caller_regs();
-        fprintf(output,"\tjal _write_float\n");
+        reg = get_reg(NULL, VAR_INT); regs[reg].status = STATUS_DONE;
+        fprintf(output, "\tla %s, _write_float\n", get_reg_name(regs[reg].id));
+        fprintf(output, "\tjalr %s\n", get_reg_name(regs[reg].id));
+        //fprintf(output,"\tjal _write_float\n");
         restore_caller_regs();
     }
     else if(param->dataType==CONST_STRING_TYPE){
@@ -877,7 +910,10 @@ void genReturnStmt(AST_NODE* returnNode) {
         fprintf(output, "\tfmv.s %s, %s\n", get_reg_name(10 + 32), get_reg_name(regs[reg].id));
     }
     flush_regs();
-    fprintf(output, "\tj %s_EXIT_\n", pNode->child->rightSibling->semantic_value.identifierSemanticValue.identifierName);
+    reg = get_reg(NULL, VAR_INT); regs[reg].status = STATUS_DONE;
+    fprintf(output, "\tla %s, %s_EXIT_\n", get_reg_name(regs[reg].id), pNode->child->rightSibling->semantic_value.identifierSemanticValue.identifierName);
+    fprintf(output, "\tjr %s\n", get_reg_name(regs[reg].id));
+    //fprintf(output, "\tj %s_EXIT_\n", pNode->child->rightSibling->semantic_value.identifierSemanticValue.identifierName);
 }
 void genConst(AST_NODE* node) {
     // TODO: improve precision
