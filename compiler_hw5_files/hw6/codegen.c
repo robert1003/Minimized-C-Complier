@@ -940,10 +940,10 @@ void genFunctionCall(AST_NODE* functionCallNode) {
             }
             else{
                 if(param->dataType==INT_TYPE){
-                    fprintf(output,"\tsw %s,%d(sp)\n",get_reg_name(regs[i].id),i*4);
+                    fprintf(output,"\tsw %s,%d(sp)\n",get_reg_name(regs[param->regnumber].id),i*4);
                 }
                 else{
-                    fprintf(output,"\tfsw %s,%d(sp)\n",get_reg_name(regs[i].id),i*4);
+                    fprintf(output,"\tfsw %s,%d(sp)\n",get_reg_name(regs[param->regnumber].id),i*4);
                 }
             }
             regs[param->regnumber].status=STATUS_DONE;
@@ -1158,7 +1158,8 @@ void genExprNode(AST_NODE* exprNode) {
         else {
             genExprRelatedNode(lc);
             reg_var type = getBiggerType(lc->dataType, rc->dataType) == INT_TYPE ? VAR_INT : VAR_FLOAT;
-            int reg1 = lc->regnumber, reg2, reg0 = get_reg(NULL, type);            
+            int reg1 = lc->regnumber, reg2, reg0 = get_reg(NULL, type);    
+            exprNode->regnumber = reg0;        
             if(type == VAR_INT) {
                 if(exprNode->semantic_value.exprSemanticValue.op.binaryOp == BINARY_OP_OR) {
                     fprintf(output, "\tbnez %s, _OR_true_%d\n", get_reg_name(regs[reg1].id), g_cnt);
