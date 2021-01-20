@@ -1,0 +1,151 @@
+test1.c
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+
+test2.c
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+
+test3.c
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+
+test4.c
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+
+test5.c
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+
+test6.c
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+
+test7.c
+66666 is at 8
+
+test8.c
+66666 is at 8
+
+test9.c
+visit 0
+visit 1
+visit 3
+visit 7
+visit 15
+visit 16
+visit 8
+visit 17
+visit 18
+visit 4
+visit 9
+visit 19
+visit 10
+visit 2
+visit 5
+visit 11
+visit 12
+visit 6
+visit 13
+visit 14
+
+test10.c
+0123
+0132
+0213
+0231
+0312
+0321
+1023
+1032
+1203
+1230
+1302
+1320
+2013
+2031
+2103
+2130
+2301
+2310
+3012
+3021
+3102
+3120
+3201
+3210
+
+
+test11.c
+MST weight = 16
+
+test12.c
+Single-Source Shortest Path:
+0-->0 : cost=0
+0-->1 : cost=2
+0-->2 : cost=5
+0-->3 : cost=6
+0-->4 : cost=7
+
+test13.c
+All-Pairs Shortest Path:
+0 2 5 6 7
+2 0 3 8 5
+5 3 0 11 7
+6 8 11 0 9
+7 5 7 9 0
+
+test14.c
+4
+
+test15.c
+634

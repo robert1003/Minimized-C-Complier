@@ -1,0 +1,18 @@
+
+hw6 extensive testcase
+
+test1.c : bubble sort
+test2.c : insertion sort
+test3.c : selection sort
+test4.c : quick sort
+test5.c : merge sort
+test6.c : heap sort
+test7.c : linear search
+test8.c : binary search
+test9.c : depth first search (Binary Tree)
+test10.c : all permutation
+test11.c : Minimum Spanning Tree(Prim)
+test12.c : Single-Source Shortest Path(Dijkstra)
+test13.c : All-Pairs Shortest Path(Floyd-Warshall) 
+test14.c : Longest Increasing Subsequence(DP)
+test15.c : 0/1 Knapsack Problem(DP)
