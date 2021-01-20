@@ -3,10 +3,10 @@ int a[10];
 
 void quicksort(int Left,int Right){
   int pivot, i, j;
+  int tmp;
   pivot = Left;
   i = Left;
   j = Right;
-  int tmp;
   if(Left>=Right){
     return;
   }

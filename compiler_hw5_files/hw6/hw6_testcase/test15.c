@@ -32,7 +32,6 @@ int MAIN(){
   value[9]=121;
   value[10]=119;
   
-  
   for(i=0;i<=N;i=i+1){
     for(j=0;j<=W;j=j+1){
       dp[i][j]=0;
