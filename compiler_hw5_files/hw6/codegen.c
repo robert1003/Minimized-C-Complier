@@ -571,8 +571,8 @@ void genDeclareFunction(AST_NODE* declarationNode) {
     gen_prologue(name->semantic_value.identifierSemanticValue.identifierName);
     symbolTable.currentLevel++;
     save_callee_regs();
-    Parameter* param=entry->attribute->attr.functionSignature->parameterList;
-    int i=0;
+    param=entry->attribute->attr.functionSignature->parameterList;
+    i=0;
     while(param) {
         int treg=get_reg(NULL,param->type->properties.dataType==INT_TYPE?VAR_INT:VAR_FLOAT);
         if(i<8){
@@ -1137,7 +1137,7 @@ void genExprNode(AST_NODE* exprNode) {
         else {
             genExprRelatedNode(lc);
             reg_var type = getBiggerType(lc->dataType, rc->dataType) == INT_TYPE ? VAR_INT : VAR_FLOAT;
-            int reg1 = lc->regnumber, reg2, reg0 = get_reg(NULL, type);
+            int reg1 = lc->regnumber, reg2, reg0 = get_reg(NULL, type);            
             if(type == VAR_INT) {
                 if(exprNode->semantic_value.exprSemanticValue.op.binaryOp == BINARY_OP_OR) {
                     fprintf(output, "\tbnez %s, _OR_true_%d\n", get_reg_name(regs[reg1].id), g_cnt);
