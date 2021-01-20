@@ -925,7 +925,9 @@ void genFunctionCall(AST_NODE* functionCallNode) {
         AST_NODE* paramList=funcIDNode->rightSibling;
         AST_NODE* param=paramList->child;
         int i=0,saved_offset=offset,pcnt=entry->attribute->attr.functionSignature->parametersCount;
-        if(pcnt>8) offset+=(pcnt-8)*4;
+        if(pcnt>8){
+            fprintf(output,"\taddi sp,sp,-%d\n",(pcnt-8)*4);
+        }
         while(param){
             genExprRelatedNode(param);
             if(i<8){
@@ -937,7 +939,12 @@ void genFunctionCall(AST_NODE* functionCallNode) {
                 }
             }
             else{
-                store_reg(param->regnumber,offset-(i-8)*4,-1);
+                if(param->dataType==INT_TYPE){
+                    fprintf(output,"\tsw %s,%d(sp)\n",get_reg_name(regs[i].id),i*4);
+                }
+                else{
+                    fprintf(output,"\tfsw %s,%d(sp)\n",get_reg_name(regs[i].id),i*4);
+                }
             }
             regs[param->regnumber].status=STATUS_DONE;
             param=param->rightSibling; i++;
@@ -945,6 +952,9 @@ void genFunctionCall(AST_NODE* functionCallNode) {
         save_caller_regs();
         fprintf(output, "\tcall %s\n", name);
         restore_caller_regs();
+        if(pcnt>8){
+            fprintf(output,"\taddi sp,sp,%d\n",(pcnt-8)*4);
+        }
         offset=saved_offset;
     }
 
