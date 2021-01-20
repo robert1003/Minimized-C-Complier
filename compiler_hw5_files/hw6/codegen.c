@@ -573,12 +573,13 @@ void genDeclareFunction(AST_NODE* declarationNode) {
     gen_prologue(name->semantic_value.identifierSemanticValue.identifierName);
     symbolTable.currentLevel++;
     save_callee_regs();
-    param=entry->attribute->attr.functionSignature->parameterList;
+    param=ptr;
     i=0;
     while(param) {
-        int treg=get_reg(NULL,param->type->properties.dataType==INT_TYPE?VAR_INT:VAR_FLOAT);
+        int treg=get_reg(NULL,param->dataType==INT_TYPE?VAR_INT:VAR_FLOAT);
         if(i<8){
-            if(param->type->properties.dataType==INT_TYPE){
+            if(param->dataType==INT_TYPE){
+                
                 fprintf(output,"\tmv %s,a%d\n",get_reg_name(regs[treg].id),i);
             }
             else{
@@ -590,8 +591,9 @@ void genDeclareFunction(AST_NODE* declarationNode) {
         }
         offset+=4;
         store_reg(treg,offset,-1);
+        param->child->rightSibling->semantic_value.identifierSemanticValue.symbolTableEntry->offset=offset;
         regs[treg].status=STATUS_DONE;
-        param=param->next; i++;
+        param=param->rightSibling; i++;
     }
 
     block = paramList->rightSibling; 
