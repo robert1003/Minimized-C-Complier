@@ -14,8 +14,15 @@ void Folyd(){
   int i,j,k;
   for(i=0;i<5;i=i+1){
     for(j=0;j<5;j=j+1){
+      write(i); write(" "); write(j); write(" "); write(G[i][j]); write(" "); write(d[i][j]); write("\n");
       d[i][j]=G[i][j];
     }
+  }
+  for(i=0;i<5;i=i+1){
+    for(j=0;j<5;j=j+1){
+        write(d[i][j]); write(" ");
+    }
+    write("\n");
   }
   for(i=0;i<5;i=i+1){
     for(j=0;j<5;j=j+1){
@@ -32,6 +39,12 @@ void Folyd(){
 int MAIN(){
   int i,j;
   build_graph();
+  for(i=0;i<5;i=i+1){
+    for(j=0;j<5;j=j+1){
+        write(G[i][j]); write(" ");
+    }
+    write("\n");
+  }
   Folyd();
   write("All-Pairs Shortest Path:\n");
   for(i=0;i<5;i=i+1){
@@ -41,4 +54,5 @@ int MAIN(){
     }
     write("\n");
   }
+  write("finish\n");
 }
