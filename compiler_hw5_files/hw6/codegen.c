@@ -513,7 +513,10 @@ void genGlobalDeclareIdList(AST_NODE* declarationNode)  {
             fprintf(output, "\t.word %d\n", val);
         }
         else if(entry->attribute->attr.typeDescriptor->kind==ARRAY_TYPE_DESCRIPTOR){
-            int length=entry->attribute->attr.typeDescriptor->properties.arrayProperties.sizeInEachDimension[0];
+            int n=entry->attribute->attr.typeDescriptor->properties.arrayProperties.dimension;
+            int length=1;
+            for(int i=0;i<n;i++)
+                assert(__builtin_smul_overflow(length,entry->attribute->attr.typeDescriptor->properties.arrayProperties.sizeInEachDimension[i],&length)==0);
             fprintf(output, "\t.section  .sbss\n\t.align  2\n");
             fprintf(output, "\t.type %s, @object\n", name);
             fprintf(output, "\t.size %s, %d\n", name,length*4);
