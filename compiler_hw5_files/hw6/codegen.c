@@ -573,7 +573,6 @@ void genDeclareFunction(AST_NODE* declarationNode) {
     gen_head(name->semantic_value.identifierSemanticValue.identifierName);
     gen_prologue(name->semantic_value.identifierSemanticValue.identifierName);
     symbolTable.currentLevel++;
-    save_callee_regs();
     param=ptr;
     i=0;
     while(param) {
@@ -597,7 +596,7 @@ void genDeclareFunction(AST_NODE* declarationNode) {
         regs[treg].status=STATUS_DONE;
         param=param->rightSibling; i++;
     }
-
+    save_callee_regs();
     block = paramList->rightSibling; 
     genBlockNode(block);
     symbolTable.currentLevel--;
