@@ -1272,8 +1272,9 @@ void genArraySubscript(AST_NODE* ptr,SymbolTableEntry *entry){
         regs[cur->regnumber].status=STATUS_DONE;
         cur=cur->rightSibling; i++;
     }
-    fprintf(output,"\tslli %s,%s,2\n",get_reg_name(regs[reg].id),get_reg_name(regs[reg].id));
-    ptr->regnumber=reg;
+    int ireg=get_reg(NULL,VAR_INT); regs[reg].status=STATUS_DONE;
+    fprintf(output,"\tslli %s,%s,2\n",get_reg_name(regs[ireg].id),get_reg_name(regs[reg].id));
+    ptr->regnumber=ireg;
 }
 void genVariableLValue(AST_NODE* idNode) {
     if(idNode->semantic_value.identifierSemanticValue.kind==ARRAY_ID) idNode->regnumber=-1;
