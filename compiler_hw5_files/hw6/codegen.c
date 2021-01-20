@@ -1283,7 +1283,8 @@ void genExprNode(AST_NODE* exprNode) {
 void genArraySubscript(AST_NODE* ptr,SymbolTableEntry *entry){
     AST_NODE *cur=ptr;
     genExprRelatedNode(cur); 
-    int reg=cur->regnumber,i=1;
+    int reg=get_reg(NULL,VAR_INT),i=1; regs[cur->regnumber].status=STATUS_DONE;
+    fprintf(output,"\tmv %s,%s\n",get_reg_name(regs[reg].id),get_reg_name(regs[cur->regnumber].id));
     cur=cur->rightSibling;
     while(cur){
         int treg=get_reg(NULL,VAR_INT); 
@@ -1296,9 +1297,8 @@ void genArraySubscript(AST_NODE* ptr,SymbolTableEntry *entry){
         regs[cur->regnumber].status=STATUS_DONE;
         cur=cur->rightSibling; i++;
     }
-    int ireg=get_reg(NULL,VAR_INT); regs[reg].status=STATUS_DONE;
-    fprintf(output,"\tslli %s,%s,2\n",get_reg_name(regs[ireg].id),get_reg_name(regs[reg].id));
-    ptr->regnumber=ireg;
+    fprintf(output,"\tslli %s,%s,2\n",get_reg_name(regs[reg].id),get_reg_name(regs[reg].id));
+    ptr->regnumber=reg;
 }
 void genVariableLValue(AST_NODE* idNode) {
     if(idNode->semantic_value.identifierSemanticValue.kind==ARRAY_ID) idNode->regnumber=-1;
