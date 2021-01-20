@@ -990,7 +990,8 @@ void declareFunction(AST_NODE* declarationNode) {
     attr->attr.functionSignature=(FunctionSignature*)malloc(sizeof(FunctionSignature));
     attr->attr.functionSignature->returnType=ret->dataType;
     attr->attr.functionSignature->parameterList=NULL;
-    if(!err) enterSymbol(name->semantic_value.identifierSemanticValue.identifierName,attr),enter=1;
+    SymbolTableEntry *entry;
+    if(!err) entry=enterSymbol(name->semantic_value.identifierSemanticValue.identifierName,attr),enter=1;
     openScope();
     AST_NODE *paramList=name->rightSibling,*ptr=paramList->child;
     int paramNum=0;
@@ -1025,6 +1026,7 @@ void declareFunction(AST_NODE* declarationNode) {
             processGeneralNode(ptr);
             ptr=ptr->rightSibling;
         }
+        name->semantic_value.identifierSemanticValue.symbolTableEntry=entry;
     }
     closeScope();
     if(err&&enter){
