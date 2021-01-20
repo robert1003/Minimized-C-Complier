@@ -1,13 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-//#include <assert.h>
+#include <assert.h>
 #include "header.h"
 #include "symbolTable.h"
 // This file is for reference only, you are not required to follow the implementation. //
 // You only need to check for errors stated in the hw4 document. //
 // TODO remove assert
-#define assert
+//#define assert
 extern int g_anyErrorOccur;
 extern DATA_TYPE getTypeOfSymbolTableEntry(SymbolTableEntry*);
 
@@ -38,7 +38,7 @@ void genVariableRValue(AST_NODE* idNode);
 void genExprOrConstValue(AST_NODE* exprOrConstNode, int* iValue, float* fValue);
 void genConst(AST_NODE* node);
 int genEvaluateExprValue(AST_NODE* exprNode);
-void genArraySubscript(AST_NODE* ptr);
+void genArraySubscript(AST_NODE* ptr,SymbolTableEntry* entry);
 typedef enum{
     STATUS_UNUSE,
     STATUS_USING,
@@ -357,7 +357,6 @@ void save_caller_regs(){
         if(regs[i].type==TYPE_CALLER&&regs[i].status==STATUS_DONE) clean_reg(i);
         else if(regs[i].entry&&!regs[i].entry->offset&&regs[i].status==STATUS_DONE) clean_reg(i); // global variable side effect
     }
-    /* TODO restore using global variable */
     for(int i=0;i<nreg;i++){
         if(regs[i].entry&&!regs[i].entry->offset){
             if(regs[i].dirty){
@@ -479,8 +478,11 @@ void genDeclareIdList(AST_NODE* declarationNode) {
             store_reg(reg_val, offset,-1); regs[reg_val].status=STATUS_DONE;
         }
         else if(entry->attribute->attr.typeDescriptor->kind==ARRAY_TYPE_DESCRIPTOR){
-            /* TODO multi dimension */
-            int length=entry->attribute->attr.typeDescriptor->properties.arrayProperties.sizeInEachDimension[0];
+            /* DONE multi dimension */
+            int n=entry->attribute->attr.typeDescriptor->properties.arrayProperties.dimension;
+            int length=1;
+            for(int i=0;i<n;i++)
+                assert(__builtin_smul_overflow(length,entry->attribute->attr.typeDescriptor->properties.arrayProperties.sizeInEachDimension[i],&length)==0);
             entry->offset=offset+=4*length;
         }
         else entry->offset=offset+=4;
@@ -723,8 +725,8 @@ void genAssignmentStmt(AST_NODE* assignmentNode) {
     genExprRelatedNode(relop_expr);
     genVariableLValue(var_ref);
     if(var_ref->regnumber==-1){
-        genArraySubscript(var_ref->child);
         SymbolTableEntry *entry=var_ref->semantic_value.identifierSemanticValue.symbolTableEntry;
+        genArraySubscript(var_ref->child,entry);
         int ireg=var_ref->child->regnumber,rreg=relop_expr->regnumber;
         if(var_ref->dataType == INT_TYPE&&relop_expr->dataType==FLOAT_TYPE) {
             int ttmp = get_reg(NULL, VAR_INT); regs[rreg].status = STATUS_DONE;
@@ -916,7 +918,6 @@ void genReturnStmt(AST_NODE* returnNode) {
     //fprintf(output, "\tj %s_EXIT_\n", pNode->child->rightSibling->semantic_value.identifierSemanticValue.identifierName);
 }
 void genConst(AST_NODE* node) {
-    // TODO: improve precision
     if(node->dataType == CONST_STRING_TYPE) return;
     reg_var type = node->dataType == INT_TYPE ? VAR_INT : VAR_FLOAT;
     int reg;
@@ -942,17 +943,16 @@ void genConst(AST_NODE* node) {
 void genExprNode(AST_NODE* exprNode) {
 	if(exprNode->semantic_value.exprSemanticValue.kind == BINARY_OPERATION) {
         AST_NODE *lc = exprNode->child, *rc = lc->rightSibling;
-    
-        int lconst = lc->nodeType == CONST_VALUE_NODE || (lc->nodeType == EXPR_NODE && lc->semantic_value.exprSemanticValue.isConstEval);
-        int rconst = rc->nodeType == CONST_VALUE_NODE || (rc->nodeType == EXPR_NODE && rc->semantic_value.exprSemanticValue.isConstEval);
 
-        genExprRelatedNode(lc);
-        genExprRelatedNode(rc);
+        if(exprNode->semantic_value.exprSemanticValue.op.binaryOp != BINARY_OP_OR &&
+            exprNode->semantic_value.exprSemanticValue.op.binaryOp != BINARY_OP_AND) {
+            genExprRelatedNode(lc);
+            genExprRelatedNode(rc);
 
-        reg_var type = getBiggerType(lc->dataType, rc->dataType) == INT_TYPE ? VAR_INT : VAR_FLOAT;
-        int reg1 = lc->regnumber, reg2 = rc->regnumber;
+            reg_var type = getBiggerType(lc->dataType, rc->dataType) == INT_TYPE ? VAR_INT : VAR_FLOAT;
+            int reg1 = lc->regnumber, reg2 = rc->regnumber;
 
-        if(type == VAR_INT) {
+            if(type == VAR_INT) {
             int reg0 = get_reg(NULL, type);
             exprNode->regnumber = reg0;
             switch(exprNode->semantic_value.exprSemanticValue.op.binaryOp) {
@@ -994,8 +994,81 @@ void genExprNode(AST_NODE* exprNode) {
                     fprintf(output, "\tsub %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
                     fprintf(output, "\tsnez %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg0].id));
                     break;
-                case BINARY_OP_OR:
+                default:
+                    assert(0);
+                }
+            }
+            else {
+                int reg0, reg11, reg22;
+                if(lc->dataType == INT_TYPE) {
+                    reg11 = get_reg(NULL, FLOAT_TYPE);
+                    fprintf(output, "\tfeq.s %s, %s, %s\n", get_reg_name(regs[reg11].id), get_reg_name(regs[reg1].id), get_reg_name(32));
+                    fprintf(output, "\tsnez %s, %s\n", get_reg_name(regs[reg11].id), get_reg_name(regs[reg11].id));
+                } else {reg11 = reg1;}
+                if(rc->dataType == INT_TYPE) {
+                    reg22 = get_reg(NULL, FLOAT_TYPE);
+                    fprintf(output, "\tfeq.s %s, %s, %s\n", get_reg_name(regs[reg22].id), get_reg_name(regs[reg2].id), get_reg_name(32));
+                    fprintf(output, "\tsnez %s, %s\n", get_reg_name(regs[reg22].id), get_reg_name(regs[reg22].id));
+                } else {reg22 = reg2;}
+                switch(exprNode->semantic_value.exprSemanticValue.op.binaryOp) {
+                    case BINARY_OP_ADD:
+                        exprNode->regnumber = reg0 = get_reg(NULL, VAR_FLOAT);
+                        fprintf(output, "\tfadd.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
+                        break;
+                    case BINARY_OP_SUB:
+                        exprNode->regnumber = reg0 = get_reg(NULL, VAR_FLOAT);
+                        fprintf(output, "\tfsub.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
+                        break;
+                    case BINARY_OP_MUL:
+                        exprNode->regnumber = reg0 = get_reg(NULL, VAR_FLOAT);
+                        fprintf(output, "\tfmul.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
+                        break;
+                    case BINARY_OP_DIV:
+                        exprNode->regnumber = reg0 = get_reg(NULL, VAR_FLOAT);
+                        fprintf(output, "\tfdiv.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
+                        break;
+                    case BINARY_OP_EQ:
+                        exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
+                        fprintf(output, "\tfeq.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
+                        break;
+                    case BINARY_OP_GE:
+                        exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
+                        // reg1 and reg2 are reversed
+                        fprintf(output, "\tfle.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg2].id), get_reg_name(regs[reg1].id));
+                        break;
+                    case BINARY_OP_GT:
+                        exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
+                        // reg1 and reg2 are reversed
+                        fprintf(output, "\tflt.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg2].id), get_reg_name(regs[reg1].id));
+                        break;
+                    case BINARY_OP_LE:
+                        exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
+                        fprintf(output, "\tfle.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
+                        break;
+                    case BINARY_OP_LT:
+                        exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
+                        fprintf(output, "\tflt.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
+                        break;
+                    case BINARY_OP_NE:
+                        exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
+                        fprintf(output, "\tfeq.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
+                        fprintf(output, "\tseqz %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg0].id));
+                        break;
+                    default:
+                        assert(0);
+                }
+            }
+            regs[reg1].status=STATUS_DONE; regs[reg2].status=STATUS_DONE;
+        }
+        else {
+            genExprRelatedNode(lc);
+            reg_var type = getBiggerType(lc->dataType, rc->dataType) == INT_TYPE ? VAR_INT : VAR_FLOAT;
+            int reg1 = lc->regnumber, reg2, reg0 = get_reg(NULL, type);
+            if(type == VAR_INT) {
+                if(exprNode->semantic_value.exprSemanticValue.op.binaryOp == BINARY_OP_OR) {
                     fprintf(output, "\tbnez %s, _OR_true_%d\n", get_reg_name(regs[reg1].id), g_cnt);
+                    genExprRelatedNode(rc);
+                    reg2 = rc->regnumber;
                     fprintf(output, "\tbeqz %s, _OR_false_%d\n", get_reg_name(regs[reg2].id), g_cnt);
                     fprintf(output, "_OR_true_%d:\n", g_cnt);
                     fprintf(output, "\tli %s, 1\n", get_reg_name(regs[reg0].id));
@@ -1003,9 +1076,11 @@ void genExprNode(AST_NODE* exprNode) {
                     fprintf(output, "_OR_false_%d:\n", g_cnt);
                     fprintf(output, "\tli %s, 0\n", get_reg_name(regs[reg0].id));
                     fprintf(output, "_OR_end_%d:\n", g_cnt++);
-                    break;
-                case BINARY_OP_AND:
+                }
+                else {
                     fprintf(output, "\tbeqz %s, _AND_false_%d\n", get_reg_name(regs[reg1].id), g_cnt);
+                    genExprRelatedNode(rc);
+                    reg2 = rc->regnumber;
                     fprintf(output, "\tbeqz %s, _AND_false_%d\n", get_reg_name(regs[reg2].id), g_cnt);
                     fprintf(output, "_AND_true_%d:\n", g_cnt);
                     fprintf(output, "\tli %s, 1\n", get_reg_name(regs[reg0].id));
@@ -1013,45 +1088,25 @@ void genExprNode(AST_NODE* exprNode) {
                     fprintf(output, "_AND_false_%d:\n", g_cnt);
                     fprintf(output, "\tli %s, 0\n", get_reg_name(regs[reg0].id));
                     fprintf(output, "_AND_end_%d:\n", g_cnt++);
-                    break;
-                default:
-                    assert(0);
+                }
             }
-        }
-        else {
-            int reg0, reg11, reg22;
-            switch(exprNode->semantic_value.exprSemanticValue.op.binaryOp) {
-                case BINARY_OP_ADD:
-                    exprNode->regnumber = reg0 = get_reg(NULL, VAR_FLOAT);
-                    fprintf(output, "\tfadd.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
-                    break;
-                case BINARY_OP_SUB:
-                    exprNode->regnumber = reg0 = get_reg(NULL, VAR_FLOAT);
-                    fprintf(output, "\tfsub.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
-                    break;
-                case BINARY_OP_MUL:
-                    exprNode->regnumber = reg0 = get_reg(NULL, VAR_FLOAT);
-                    fprintf(output, "\tfmul.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
-                    break;
-                case BINARY_OP_DIV:
-                    exprNode->regnumber = reg0 = get_reg(NULL, VAR_FLOAT);
-                    fprintf(output, "\tfdiv.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
-                    break;
-                // DOTO XXX giver will fix it
-                case BINARY_OP_OR:
-                    // TODO: float 0 in feq.s
+            else {
+                int reg0, reg11, reg22;
+                if(exprNode->semantic_value.exprSemanticValue.op.binaryOp == BINARY_OP_OR) {
                     if(lc->dataType == FLOAT_TYPE) {
                       reg11 = get_reg(NULL, VAR_INT);
                       fprintf(output, "\tfeq.s %s, %s, %s\n", get_reg_name(regs[reg11].id), get_reg_name(regs[reg1].id), get_reg_name(32));
                       fprintf(output, "\tsnez %s, %s\n", get_reg_name(regs[reg11].id), get_reg_name(regs[reg11].id));
                     } else {reg11 = reg1;}
+                    fprintf(output, "\tbnez %s, _OR_true_%d\n", get_reg_name(regs[reg11].id), g_cnt);
+                    exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
+                    genExprRelatedNode(rc);
+                    reg2 = rc->regnumber;
                     if(rc->dataType == FLOAT_TYPE) {
                       reg22 = get_reg(NULL, VAR_INT);
                       fprintf(output, "\tfeq.s %s, %s, %s\n", get_reg_name(regs[reg22].id), get_reg_name(regs[reg2].id), get_reg_name(32));
                       fprintf(output, "\tsnez %s, %s\n", get_reg_name(regs[reg22].id), get_reg_name(regs[reg22].id));
                     } else {reg22 = reg2;}
-                    exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
-                    fprintf(output, "\tbnez %s, _OR_true_%d\n", get_reg_name(regs[reg11].id), g_cnt);
                     fprintf(output, "\tbeqz %s, _OR_false_%d\n", get_reg_name(regs[reg22].id), g_cnt);
                     fprintf(output, "_OR_true_%d:\n", g_cnt);
                     fprintf(output, "\tli %s, 1\n", get_reg_name(regs[reg0].id));
@@ -1060,20 +1115,23 @@ void genExprNode(AST_NODE* exprNode) {
                     fprintf(output, "\tli %s, 0\n", get_reg_name(regs[reg0].id));
                     fprintf(output, "_OR_end_%d:\n", g_cnt++);
                     regs[reg11].status=STATUS_DONE; regs[reg22].status=STATUS_DONE;
-                    break;
-                case BINARY_OP_AND:
+                }
+                else {
                     exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
                     if(lc->dataType == FLOAT_TYPE) {
                       reg11 = get_reg(NULL, VAR_INT);
                       fprintf(output, "\tfeq.s %s, %s, %s\n", get_reg_name(regs[reg11].id), get_reg_name(regs[reg1].id), get_reg_name(32));
                       fprintf(output, "\tsnez %s, %s\n", get_reg_name(regs[reg11].id), get_reg_name(regs[reg11].id));
                     } else {reg11 = reg1;}
+                    fprintf(output, "\tbeqz %s, _AND_false_%d\n", get_reg_name(regs[reg11].id), g_cnt);
+                    exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
+                    genExprRelatedNode(rc);
+                    reg2 = rc->regnumber;
                     if(rc->dataType == FLOAT_TYPE) {
                       reg22 = get_reg(NULL, VAR_INT);
                       fprintf(output, "\tfeq.s %s, %s, %s\n", get_reg_name(regs[reg22].id), get_reg_name(regs[reg2].id), get_reg_name(32));
                       fprintf(output, "\tsnez %s, %s\n", get_reg_name(regs[reg22].id), get_reg_name(regs[reg22].id));
                     } else {reg22 = reg2;}
-                    fprintf(output, "\tbeqz %s, _AND_false_%d\n", get_reg_name(regs[reg11].id), g_cnt);
                     fprintf(output, "\tbeqz %s, _AND_false_%d\n", get_reg_name(regs[reg22].id), g_cnt);
                     fprintf(output, "_AND_true_%d:\n", g_cnt);
                     fprintf(output, "\tli %s, 1\n", get_reg_name(regs[reg0].id));
@@ -1082,39 +1140,10 @@ void genExprNode(AST_NODE* exprNode) {
                     fprintf(output, "\tli %s, 0\n", get_reg_name(regs[reg0].id));
                     fprintf(output, "_AND_end_%d:\n", g_cnt++);
                     regs[reg11].status=STATUS_DONE; regs[reg22].status=STATUS_DONE;
-                    break;                    
-                case BINARY_OP_EQ:
-                    exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
-                    fprintf(output, "\tfeq.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
-                    break;
-                case BINARY_OP_GE:
-                    exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
-                    // reg1 and reg2 are reversed
-                    fprintf(output, "\tfle.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg2].id), get_reg_name(regs[reg1].id));
-                    break;
-                case BINARY_OP_GT:
-                    exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
-                    // reg1 and reg2 are reversed
-                    fprintf(output, "\tflt.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg2].id), get_reg_name(regs[reg1].id));
-                    break;
-                case BINARY_OP_LE:
-                    exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
-                    fprintf(output, "\tfle.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
-                    break;
-                case BINARY_OP_LT:
-                    exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
-                    fprintf(output, "\tflt.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
-                    break;
-                case BINARY_OP_NE:
-                    exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
-                    fprintf(output, "\tfeq.s %s, %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg1].id), get_reg_name(regs[reg2].id));
-                    fprintf(output, "\tseqz %s, %s\n", get_reg_name(regs[reg0].id), get_reg_name(regs[reg0].id));
-                    break;
-                default:
-                    assert(0);
+                }
             }
+            regs[reg1].status=STATUS_DONE; regs[reg2].status=STATUS_DONE;
         }
-        regs[reg1].status=STATUS_DONE; regs[reg2].status=STATUS_DONE;
     }
     else {
         AST_NODE *rc = exprNode->child; 
@@ -1153,12 +1182,24 @@ void genExprNode(AST_NODE* exprNode) {
         regs[reg].status=STATUS_DONE;
     }
 }
-void genArraySubscript(AST_NODE* ptr){
+void genArraySubscript(AST_NODE* ptr,SymbolTableEntry *entry){
     /* TODO multi dimension */
-    genExprRelatedNode(ptr); 
-    int ireg=get_reg(NULL,VAR_INT); regs[ptr->regnumber].status=STATUS_DONE;
-    fprintf(output,"\tslli %s,%s,2\n",get_reg_name(regs[ireg].id),get_reg_name(regs[ptr->regnumber].id));
-    ptr->regnumber=ireg;
+    AST_NODE *cur=ptr;
+    genExprRelatedNode(cur); cur=cur->rightSibling;
+    int reg=cur->regnumber,i=1;
+    while(ptr){
+        int treg=get_reg(NULL,VAR_INT); 
+        Int tmp; tmp.val=entry->attribute->attr.typeDescriptor->properties.arrayProperties.sizeInEachDimension[i];
+        gen_loadimm(treg,tmp);
+        fprintf(output,"\tmul %s,%s,%s\n",get_reg_name(regs[reg].id),get_reg_name(regs[reg].id),get_reg_name(regs[treg].id));
+        regs[treg].status=STATUS_DONE;
+        genExprRelatedNode(cur);
+        fprintf(output,"\tadd %s,%s,%s\n",get_reg_name(regs[reg].id),get_reg_name(regs[reg].id),get_reg_name(regs[cur->regnumber].id));
+        regs[cur->regnumber].status=STATUS_DONE;
+        cur=ptr->rightSibling; i++;
+    }
+    fprintf(output,"\tslli %s,%s,2\n",get_reg_name(regs[reg].id),get_reg_name(regs[reg].id));
+    ptr->regnumber=reg;
 }
 void genVariableLValue(AST_NODE* idNode) {
     if(idNode->semantic_value.identifierSemanticValue.kind==ARRAY_ID) idNode->regnumber=-1;
@@ -1168,8 +1209,7 @@ void genVariableRValue(AST_NODE* idNode) {
 	SymbolTableEntry *entry=idNode->semantic_value.identifierSemanticValue.symbolTableEntry;
     TypeDescriptor* tpdes=idNode->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
     if(idNode->semantic_value.identifierSemanticValue.kind==ARRAY_ID){
-        /* giver TODO */
-        genArraySubscript(idNode->child);
+        genArraySubscript(idNode->child,entry);
         int ireg=idNode->child->regnumber; 
         idNode->regnumber=get_reg(NULL,tpdes->properties.arrayProperties.elementType==INT_TYPE?VAR_INT:VAR_FLOAT);
         if(entry->offset) load_reg(idNode->regnumber,entry->offset,ireg);
