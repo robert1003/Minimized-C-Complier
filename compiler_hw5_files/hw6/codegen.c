@@ -537,12 +537,13 @@ void genDeclareFunction(AST_NODE* declarationNode) {
     int s_gcnt=g_cnt;
     flush_regs();
     symbolTable.currentLevel++;
-    Parameter* param=entry->attribute->attr.functionSignature->parameterList;
+    AST_NODE* param=ptr;
     int i=0;
     while(param) {
-        int treg=get_reg(NULL,param->type->properties.dataType==INT_TYPE?VAR_INT:VAR_FLOAT);
+        int treg=get_reg(NULL,param->dataType==INT_TYPE?VAR_INT:VAR_FLOAT);
         if(i<8){
-            if(param->type->properties.dataType==INT_TYPE){
+            if(param->dataType==INT_TYPE){
+                
                 fprintf(output,"\tmv %s,a%d\n",get_reg_name(regs[treg].id),i);
             }
             else{
@@ -554,8 +555,9 @@ void genDeclareFunction(AST_NODE* declarationNode) {
         }
         offset+=4;
         store_reg(treg,offset,-1);
+        param->child->rightSibling->semantic_value.identifierSemanticValue.symbolTableEntry->offset=offset;
         regs[treg].status=STATUS_DONE;
-        param=param->next; i++;
+        param=param->rightSibling; i++;
     }
     AST_NODE *block = paramList->rightSibling; 
     genBlockNode(block);
@@ -649,12 +651,17 @@ void genGeneralNode(AST_NODE *node) {
     node->nodeType == NONEMPTY_ASSIGN_EXPR_LIST_NODE || 
     node->nodeType == NONEMPTY_RELOP_EXPR_LIST_NODE) {
         AST_NODE* ptr = node->child;
+        int first = 1;
         while(ptr) {
             if(node->nodeType == VARIABLE_DECL_LIST_NODE) (symbolTable.currentLevel?genDeclarationNode(ptr): genGlobalDeclareIdList(ptr));
             else if(node->nodeType == STMT_LIST_NODE) genStmtNode(ptr);
             else if(node->nodeType == NONEMPTY_ASSIGN_EXPR_LIST_NODE) genAssignOrExpr(ptr);
             else if(node->nodeType == NONEMPTY_RELOP_EXPR_LIST_NODE) genExprRelatedNode(ptr);
-
+            
+            if(first) {
+                node->regnumber = ptr->regnumber;
+                first = 0;
+            }
             assert(ptr->dataType != ERROR_TYPE);
             ptr = ptr->rightSibling;
         }
