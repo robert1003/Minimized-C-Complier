@@ -1164,39 +1164,42 @@ void genExprNode(AST_NODE* exprNode) {
             exprNode->regnumber = reg0;        
             if(type == VAR_INT) {
                 if(exprNode->semantic_value.exprSemanticValue.op.binaryOp == BINARY_OP_OR) {
-                    fprintf(output, "\tbnez %s, _OR_true_%d\n", get_reg_name(regs[reg1].id), g_cnt);
+                  int cnt = g_cnt++;
+                    fprintf(output, "\tbnez %s, _OR_true_%d\n", get_reg_name(regs[reg1].id), cnt);
                     genExprRelatedNode(rc);
                     reg2 = rc->regnumber;
-                    fprintf(output, "\tbeqz %s, _OR_false_%d\n", get_reg_name(regs[reg2].id), g_cnt);
-                    fprintf(output, "_OR_true_%d:\n", g_cnt);
+                    fprintf(output, "\tbeqz %s, _OR_false_%d\n", get_reg_name(regs[reg2].id), cnt);
+                    fprintf(output, "_OR_true_%d:\n", cnt);
                     fprintf(output, "\tli %s, 1\n", get_reg_name(regs[reg0].id));
-                    fprintf(output, "j _OR_end_%d\n", g_cnt);
-                    fprintf(output, "_OR_false_%d:\n", g_cnt);
+                    fprintf(output, "j _OR_end_%d\n", cnt);
+                    fprintf(output, "_OR_false_%d:\n", cnt);
                     fprintf(output, "\tli %s, 0\n", get_reg_name(regs[reg0].id));
-                    fprintf(output, "_OR_end_%d:\n", g_cnt++);
+                    fprintf(output, "_OR_end_%d:\n", cnt);
                 }
                 else {
-                    fprintf(output, "\tbeqz %s, _AND_false_%d\n", get_reg_name(regs[reg1].id), g_cnt);
+                  int cnt = g_cnt++;
+                    fprintf(output, "\tbeqz %s, _AND_false_%d\n", get_reg_name(regs[reg1].id), cnt);
                     genExprRelatedNode(rc);
                     reg2 = rc->regnumber;
-                    fprintf(output, "\tbeqz %s, _AND_false_%d\n", get_reg_name(regs[reg2].id), g_cnt);
-                    fprintf(output, "_AND_true_%d:\n", g_cnt);
+                    fprintf(output, "\tbeqz %s, _AND_false_%d\n", get_reg_name(regs[reg2].id), cnt);
+                    fprintf(output, "_AND_true_%d:\n", cnt);
                     fprintf(output, "\tli %s, 1\n", get_reg_name(regs[reg0].id));
-                    fprintf(output, "j _AND_end_%d\n", g_cnt);
-                    fprintf(output, "_AND_false_%d:\n", g_cnt);
+                    fprintf(output, "j _AND_end_%d\n", cnt);
+                    fprintf(output, "_AND_false_%d:\n", cnt);
                     fprintf(output, "\tli %s, 0\n", get_reg_name(regs[reg0].id));
-                    fprintf(output, "_AND_end_%d:\n", g_cnt++);
+                    fprintf(output, "_AND_end_%d:\n", cnt);
                 }
             }
             else {
                 int reg0, reg11, reg22;
                 if(exprNode->semantic_value.exprSemanticValue.op.binaryOp == BINARY_OP_OR) {
+                  int cnt = g_cnt++;
                     if(lc->dataType == FLOAT_TYPE) {
                       reg11 = get_reg(NULL, VAR_INT);
                       fprintf(output, "\tfeq.s %s, %s, %s\n", get_reg_name(regs[reg11].id), get_reg_name(regs[reg1].id), get_reg_name(32));
                       fprintf(output, "\tseqz %s, %s\n", get_reg_name(regs[reg11].id), get_reg_name(regs[reg11].id));
                     } else {reg11 = reg1;}
-                    fprintf(output, "\tbnez %s, _OR_true_%d\n", get_reg_name(regs[reg11].id), g_cnt);
+                    fprintf(output, "\tbnez %s, _OR_true_%d\n", get_reg_name(regs[reg11].id), cnt);
                     exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
                     genExprRelatedNode(rc);
                     reg2 = rc->regnumber;
@@ -1205,23 +1208,24 @@ void genExprNode(AST_NODE* exprNode) {
                       fprintf(output, "\tfeq.s %s, %s, %s\n", get_reg_name(regs[reg22].id), get_reg_name(regs[reg2].id), get_reg_name(32));
                       fprintf(output, "\tseqz %s, %s\n", get_reg_name(regs[reg22].id), get_reg_name(regs[reg22].id));
                     } else {reg22 = reg2;}
-                    fprintf(output, "\tbeqz %s, _OR_false_%d\n", get_reg_name(regs[reg22].id), g_cnt);
-                    fprintf(output, "_OR_true_%d:\n", g_cnt);
+                    fprintf(output, "\tbeqz %s, _OR_false_%d\n", get_reg_name(regs[reg22].id), cnt);
+                    fprintf(output, "_OR_true_%d:\n", cnt);
                     fprintf(output, "\tli %s, 1\n", get_reg_name(regs[reg0].id));
-                    fprintf(output, "j _OR_end_%d\n", g_cnt);
-                    fprintf(output, "_OR_false_%d:\n", g_cnt);
+                    fprintf(output, "j _OR_end_%d\n", cnt);
+                    fprintf(output, "_OR_false_%d:\n", cnt);
                     fprintf(output, "\tli %s, 0\n", get_reg_name(regs[reg0].id));
-                    fprintf(output, "_OR_end_%d:\n", g_cnt++);
+                    fprintf(output, "_OR_end_%d:\n", cnt);
                     regs[reg11].status=STATUS_DONE; regs[reg22].status=STATUS_DONE;
                 }
                 else {
+                  int cnt = g_cnt++;
                     exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
                     if(lc->dataType == FLOAT_TYPE) {
                       reg11 = get_reg(NULL, VAR_INT);
                       fprintf(output, "\tfeq.s %s, %s, %s\n", get_reg_name(regs[reg11].id), get_reg_name(regs[reg1].id), get_reg_name(32));
                       fprintf(output, "\tseqz %s, %s\n", get_reg_name(regs[reg11].id), get_reg_name(regs[reg11].id));
                     } else {reg11 = reg1;}
-                    fprintf(output, "\tbeqz %s, _AND_false_%d\n", get_reg_name(regs[reg11].id), g_cnt);
+                    fprintf(output, "\tbeqz %s, _AND_false_%d\n", get_reg_name(regs[reg11].id), cnt);
                     exprNode->regnumber = reg0 = get_reg(NULL, VAR_INT);
                     genExprRelatedNode(rc);
                     reg2 = rc->regnumber;
@@ -1230,13 +1234,13 @@ void genExprNode(AST_NODE* exprNode) {
                       fprintf(output, "\tfeq.s %s, %s, %s\n", get_reg_name(regs[reg22].id), get_reg_name(regs[reg2].id), get_reg_name(32));
                       fprintf(output, "\tseqz %s, %s\n", get_reg_name(regs[reg22].id), get_reg_name(regs[reg22].id));
                     } else {reg22 = reg2;}
-                    fprintf(output, "\tbeqz %s, _AND_false_%d\n", get_reg_name(regs[reg22].id), g_cnt);
-                    fprintf(output, "_AND_true_%d:\n", g_cnt);
+                    fprintf(output, "\tbeqz %s, _AND_false_%d\n", get_reg_name(regs[reg22].id), cnt);
+                    fprintf(output, "_AND_true_%d:\n", cnt);
                     fprintf(output, "\tli %s, 1\n", get_reg_name(regs[reg0].id));
-                    fprintf(output, "j _AND_end_%d\n", g_cnt);
-                    fprintf(output, "_AND_false_%d:\n", g_cnt);
+                    fprintf(output, "j _AND_end_%d\n", cnt);
+                    fprintf(output, "_AND_false_%d:\n", cnt);
                     fprintf(output, "\tli %s, 0\n", get_reg_name(regs[reg0].id));
-                    fprintf(output, "_AND_end_%d:\n", g_cnt++);
+                    fprintf(output, "_AND_end_%d:\n", cnt);
                     regs[reg11].status=STATUS_DONE; regs[reg22].status=STATUS_DONE;
                 }
             }
