@@ -4,7 +4,7 @@ A minimized RISCV C compiler that supports a subset of C operations, including f
 
 Some Caveats
 * Definition must be at the top of each function
-* Use `MAIN` instead of `main` as function entry point
+* Use `MAIN` instead of `main` as program entry point
 
 ## Example program
 
